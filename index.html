@@ -1018,7 +1018,7 @@
 
         <div id="order-modal" class="modal">
             <div class="modal-content">
-                <span class="close" onclick="closeModal('order-modal')">&times;</span>
+                <span class="close" data-modal-id="order-modal">&times;</span>
                 <h2 id="modal-order-title">Detalhes do Pedido</h2>
                 <div id="modal-order-content">
                 </div>
@@ -1030,7 +1030,7 @@
 
         <div id="shipment-modal" class="modal">
             <div class="modal-content">
-                <span class="close" onclick="closeModal('shipment-modal')">&times;</span>
+                <span class="close" data-modal-id="shipment-modal">&times;</span>
                 <h2>Confirmar Expedição</h2>
                 <div class="form-group">
                     <label for="shipment-carrier">Transportadora</label>
@@ -1080,8 +1080,6 @@
         let db;
         let auth;
         let userId = null;
-        // Removido isAuthReady pois o updateUI será chamado diretamente do onAuthStateChanged
-        // let isAuthReady = false; // Flag para indicar que a autenticação foi inicializada
 
         // Caches de dados locais (serão sincronizados com Firestore)
         let ordersData = [];
@@ -1093,6 +1091,31 @@
 
         // Objeto global para armazenar instâncias de gráficos
         let chartInstances = {};
+
+        // Função para abrir um modal
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('show');
+        }
+
+        // Função para fechar um modal
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('show');
+                // Tratamento especial para modais de alerta/confirmação personalizados
+                if (modalId === 'custom-alert-modal' || modalId === 'custom-confirm-modal') {
+                    modal.style.opacity = '0';
+                    modal.style.pointerEvents = 'none';
+                    // Usa um timeout para garantir que a transição seja concluída antes de definir display como 'none'
+                    setTimeout(() => {
+                        modal.style.display = 'none';
+                    }, 300); // Corresponder esta duração com a duração da transição CSS
+                }
+            }
+        }
+        // Torna closeModal globalmente acessível para onclick embutido (embora seja preferível usar addEventListener)
+        window.closeModal = closeModal;
+
 
         // Inicializa o Firebase e a autenticação
         async function initializeFirebase() {
@@ -1106,7 +1129,6 @@
                     if (user) {
                         userId = user.uid;
                         document.getElementById('user-info').textContent = `Usuário ID: ${userId} (Dados salvos na nuvem)`;
-                        // isAuthReady = true; // Não é mais necessário
                         console.log("Firebase Auth e Firestore prontos. User ID:", userId);
                         // Carrega os dados do Firestore após a autenticação
                         await loadDataFromFirestore();
@@ -1182,7 +1204,10 @@
         async function saveOrderToStorage(order) {
             if (!db || !userId) { customAlert("Erro: Firebase não inicializado ou usuário não autenticado."); return; }
             try {
-                const orderRef = doc(db, `artifacts/${appId}/users/${userId}/orders`, order.orderNumber);
+                // Constrói o caminho completo do documento
+                const docPath = `artifacts/${appId}/users/${userId}/orders/${order.orderNumber}`;
+                console.log("Tentando salvar pedido no Firestore. Caminho do documento:", docPath);
+                const orderRef = doc(db, docPath);
                 await setDoc(orderRef, order, { merge: true }); // Usa merge para atualizar parcialmente
                 console.log("Pedido salvo no Firestore:", order.orderNumber);
                 return order;
@@ -1197,7 +1222,9 @@
             if (!db || !userId) { customAlert("Erro: Firebase não inicializado ou usuário não autenticado."); return; }
             try {
                 // Deleta o documento do pedido
-                await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/orders`, orderNumber));
+                const docPath = `artifacts/${appId}/users/${userId}/orders/${orderNumber}`;
+                console.log("Tentando excluir pedido do Firestore. Caminho do documento:", docPath);
+                await deleteDoc(doc(db, docPath));
 
                 // Deleta anexos relacionados
                 const qAttachments = query(collection(db, `artifacts/${appId}/users/${userId}/attachments`), where("orderNumber", "==", orderNumber));
@@ -1227,7 +1254,8 @@
                     action
                 });
                 console.log("Atividade adicionada ao Firestore.");
-            } catch (e) {
+            }
+            catch (e) {
                 console.error("Erro ao adicionar atividade ao Firestore:", e);
                 customAlert("Erro ao registrar atividade na nuvem.");
             }
@@ -1236,7 +1264,9 @@
         async function addAttachmentToStorage(attachment) {
             if (!db || !userId) { customAlert("Erro: Firebase não inicializado ou usuário não autenticado."); return; }
             try {
-                await setDoc(doc(db, `artifacts/${appId}/users/${userId}/attachments`, attachment.id), attachment);
+                const docPath = `artifacts/${appId}/users/${userId}/attachments/${attachment.id}`;
+                console.log("Tentando adicionar anexo ao Firestore. Caminho do documento:", docPath);
+                await setDoc(doc(db, docPath), attachment);
                 console.log("Anexo adicionado ao Firestore:", attachment.id);
             } catch (e) {
                 console.error("Erro ao adicionar anexo ao Firestore:", e);
@@ -1247,7 +1277,9 @@
         async function deleteAttachmentFromStorage(attachmentId) {
             if (!db || !userId) { customAlert("Erro: Firebase não inicializado ou usuário não autenticado."); return; }
             try {
-                await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/attachments`, attachmentId));
+                const docPath = `artifacts/${appId}/users/${userId}/attachments/${attachmentId}`;
+                console.log("Tentando excluir anexo do Firestore. Caminho do documento:", docPath);
+                await deleteDoc(doc(db, docPath));
                 console.log("Anexo excluído do Firestore:", attachmentId);
             } catch (e) {
                 console.error("Erro ao excluir anexo do Firestore:", e);
@@ -1262,9 +1294,6 @@
             // Inicia a inicialização do Firebase
             initializeFirebase();
 
-            // O restante da inicialização da UI pode ser chamado aqui,
-            // mas as operações que dependem de `db`, `auth`, `userId`
-            // devem ser chamadas após `isAuthReady` ser true (dentro do onAuthStateChanged)
             setupTabs();
             initPanelTab();
             initSalesTab();
@@ -1282,7 +1311,6 @@
             setupModals();
             setupCustomAlert();
             setupCustomConfirm();
-            // updateUI() é chamado automaticamente pelos listeners do Firestore
         });
 
         // Configura a navegação entre as abas
@@ -1321,11 +1349,15 @@
         // Configura os modais
         function setupModals() {
             const modals = document.querySelectorAll('.modal');
+            // Alterado para usar data-modal-id para evitar conflito com o onclick global
             const closeButtons = document.querySelectorAll('.close');
 
             closeButtons.forEach(button => {
                 button.addEventListener('click', function() {
-                    closeModal(this.closest('.modal').id);
+                    const modalId = this.getAttribute('data-modal-id');
+                    if (modalId) {
+                        closeModal(modalId);
+                    }
                 });
             });
 
@@ -1338,27 +1370,6 @@
             });
         }
 
-        // Função para abrir um modal
-        function openModal(modalId) {
-            document.getElementById(modalId).classList.add('show');
-        }
-
-        // Função para fechar um modal
-        function closeModal(modalId) {
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                modal.classList.remove('show');
-                // Tratamento especial para modais de alerta/confirmação personalizados
-                if (modalId === 'custom-alert-modal' || modalId === 'custom-confirm-modal') {
-                    modal.style.opacity = '0';
-                    modal.style.pointerEvents = 'none';
-                    // Usa um timeout para garantir que a transição seja concluída antes de definir display como 'none'
-                    setTimeout(() => {
-                        modal.style.display = 'none';
-                    }, 300); // Corresponder esta duração com a duração da transição CSS
-                }
-            }
-        }
 
         // Funções para a caixa de alerta/mensagem personalizada
         function setupCustomAlert() {
@@ -1641,8 +1652,11 @@
             document.getElementById('sales-add-other').addEventListener('click', () => document.getElementById('sales-other-file').click());
 
             const handleFile = (e, type) => {
-                const orderNumber = document.getElementById('sales-order').value;
+                const orderNumberInput = document.getElementById('sales-order');
+                const orderNumber = orderNumberInput.value.trim().replace(/\//g, ''); // Sanitize orderNumber
                 if (!orderNumber) { customAlert('Insira o número do pedido primeiro.'); return; }
+                orderNumberInput.value = orderNumber; // Update input with sanitized value
+
                 const order = ordersData.find(o => o.orderNumber === orderNumber);
                 if (order) {
                     currentOrder = order;
@@ -1658,7 +1672,9 @@
             document.getElementById('sales-save').addEventListener('click', saveSalesData);
 
             document.getElementById('sales-order').addEventListener('change', function() {
-                const order = ordersData.find(o => o.orderNumber === this.value);
+                const sanitizedOrderNumber = this.value.trim().replace(/\//g, ''); // Sanitize on change
+                this.value = sanitizedOrderNumber; // Update input with sanitized value
+                const order = ordersData.find(o => o.orderNumber === sanitizedOrderNumber);
                 if (order) {
                     populateSalesForm(order);
                 } else {
@@ -1818,8 +1834,10 @@
         }
 
         async function saveSalesData() {
-            const orderNumber = document.getElementById('sales-order').value;
+            const orderNumberInput = document.getElementById('sales-order');
+            const orderNumber = orderNumberInput.value.trim().replace(/\//g, ''); // Sanitize orderNumber
             if (!orderNumber) { customAlert('Insira o número do pedido.'); return; }
+            orderNumberInput.value = orderNumber; // Update input with sanitized value
 
             const products = [];
             document.getElementById('products-body').querySelectorAll('tr').forEach(row => {
@@ -2255,7 +2273,7 @@
                     item.className = 'attachment-item';
                     item.innerHTML = `<h4>${attachment.name}</h4><p>Dept: ${attachment.department}</p><div class="attachment-actions"><button class="btn btn-sm download-attachment" data-id="${attachment.id}">Download</button> <button class="btn btn-sm btn-danger delete-attachment" data-id="${attachment.id}">Excluir</button></div>`;
                     item.querySelector('.download-attachment').addEventListener('click', e => downloadAttachment(e.target.getAttribute('data-id')));
-                    item.querySelector('.delete-attachment').addEventListener('click', e => deleteAttachment(e.target.getAttribute('data-id'), orderNumber));
+                    item.querySelector('.delete-attachment').addEventListener('click', e => deleteAttachment(e.target.getAttribute('data-id'), orderNumber)); // Corrected: removed extra ')'
                     html += item.outerHTML; // Adiciona o HTML do item ao HTML geral
                 });
             }
@@ -2416,7 +2434,7 @@
 
                     for (const item of jsonData) {
                         try {
-                            const orderNumber = item['Nº Pedido']?.toString();
+                            const orderNumber = item['Nº Pedido']?.toString().trim().replace(/\//g, ''); // Sanitize orderNumber
                             if (!orderNumber || ordersData.some(o => o.orderNumber === orderNumber)) {
                                 skippedCount++;
                                 continue;
@@ -2517,7 +2535,6 @@
         async function saveDepartmentData(dept) {
             if (!currentOrder) { customAlert('Selecione um pedido.'); return; }
 
-            // Corrigido o erro de sintaxe aqui: `.` em vez de `'` antes de .value
             const promisedDate = document.getElementById(`${dept.id}-promised-date`).value;
             if (!promisedDate) { customAlert(`Preencha a data prometida para ${dept.name}.`); return; }
 
