@@ -1066,8 +1066,34 @@
         </div>
     </div>
 
+
+    
     <script type="module">
+
+
+
+  console.log("Verificando Firebase SDKs...");
+  if (typeof firebase === 'undefined') {
+    console.error("Firebase SDK não carregado!");
+  } else {
+    console.log("Firebase SDK carregado com sucesso");
+  }
+
         // Importações do Firebase
+
+const __firebase_config = {
+    apiKey: "Mge",
+    authDomain: "GerenciadorPedidosMge.firebaseapp.com",
+    projectId: "GerenciadorPedidosMge",
+    storageBucket: "GerenciadorPedidosMge.appspot.com",
+    messagingSenderId: "123456789012",
+    appId: "1:123456789012:web:abcdef1234567890abcdef"
+  };
+  const __app_id = "GerenciadorPedidosMge"; // Geralmente o mesmo que projectId
+  
+  console.log("Configuração do Firebase carregada:", __firebase_config);
+
+
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -1119,10 +1145,13 @@
 
         // Inicializa o Firebase e a autenticação
         async function initializeFirebase() {
-            try {
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
+    try {
+        console.log("Inicializando Firebase com configuração:", firebaseConfig);
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        console.log("Firebase inicializado com sucesso");
+
 
                 // Listener para o estado de autenticação
                 onAuthStateChanged(auth, async (user) => {
@@ -1143,13 +1172,12 @@
                     }
                     document.getElementById('loading-overlay').style.display = 'none'; // Esconde o overlay de carregamento
                 });
-            } catch (error) {
-                console.error("Erro ao inicializar Firebase:", error);
-                customAlert("Erro ao inicializar o Firebase. Verifique sua configuração ou conexão.");
-                document.getElementById('loading-overlay').style.display = 'none';
-            }
-        }
-
+    } catch (error) {
+        console.error("Erro ao inicializar Firebase:", error);
+        customAlert("Erro crítico: Não foi possível conectar ao Firebase. Verifique sua conexão e atualize a página.");
+        document.getElementById('loading-overlay').style.display = 'none';
+    }
+}
         // Funções para gerenciar o Firestore
         async function loadDataFromFirestore() {
             if (!db || !userId) {
