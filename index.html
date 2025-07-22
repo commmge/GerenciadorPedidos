@@ -1061,40 +1061,41 @@
     </div>
 
     <script type="module">
-        // Variáveis Firebase (serão inicializadas em initFirebase)
+        // Firebase variables (will be initialized in initFirebase)
         let app;
         let db;
         let auth;
-        let userId = 'anonymous'; // Padrão para anônimo até autenticação
-        let isAuthReady = false; // Flag para garantir que o Firebase esteja pronto antes das operações
+        let userId = 'anonymous'; // Default to anonymous until authenticated
+        let isAuthReady = false; // Flag to ensure Firebase is ready before operations
 
-        // Caches de dados locais, atualizados por snapshots do Firestore
+        // Local data caches, updated by Firestore snapshots
         let ordersData = [];
         let activitiesData = [];
         let attachmentsData = [];
 
-        // Pedido atual sendo visualizado/editado
+        // Current order being viewed/edited
         let currentOrder = null;
 
-        // Objeto global para armazenar instâncias de gráficos
+        // Global object to store chart instances
         let chartInstances = {};
 
-        // Variáveis globais fornecidas pelo ambiente Canvas (se aplicável)
-        // Se você estiver implantando isso diretamente no GitHub Pages, precisará configurar
-        // seu próprio projeto Firebase e colar as credenciais aqui ou usar variáveis de ambiente
-        // ou um proxy para segurança em produção. Para fins de demonstração, deixamos como está.
+        // Global variables provided by the Canvas environment (if applicable)
+        // If you are deploying this directly to GitHub Pages, you will need to configure
+        // your own Firebase project and paste the credentials here or use environment variables
+        // or a proxy for security in production. For demonstration purposes, we leave it as is.
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        // Caminhos das Coleções do Firestore
-        const getOrdersCollection = () => firebase.collection(db, `artifacts/${appId}/users/${userId}/orders`);
-        const getActivitiesCollection = () => firebase.collection(db, `artifacts/${appId}/users/${userId}/activities`);
-        const getAttachmentsCollection = () => firebase.collection(db, `artifacts/${appId}/users/${userId}/attachments`);
+        // Firestore Collection Paths
+        // Corrected to use explicit path segments for firebase.collection and firebase.doc
+        const getOrdersCollection = () => firebase.collection(db, 'artifacts', appId, 'users', userId, 'orders');
+        const getActivitiesCollection = () => firebase.collection(db, 'artifacts', appId, 'users', userId, 'activities');
+        const getAttachmentsCollection = () => firebase.collection(db, 'artifacts', appId, 'users', userId, 'attachments');
 
-        // Inicializa a aplicação
+        // Initialize the application
         document.addEventListener('DOMContentLoaded', async function() {
-            await initFirebase(); // Inicializa o Firebase primeiro
+            await initFirebase(); // Initialize Firebase first
             setupTabs();
             initPanelTab();
             initSalesTab();
@@ -1120,27 +1121,27 @@
                 db = firebase.getFirestore(app);
                 auth = firebase.getAuth(app);
 
-                // Autentica o usuário
+                // Authenticate the user
                 if (initialAuthToken) {
                     await firebase.signInWithCustomToken(auth, initialAuthToken);
                 } else {
                     await firebase.signInAnonymously(auth);
                 }
 
-                // Escuta as mudanças de estado de autenticação e define o userId
+                // Listen for authentication state changes and set userId
                 firebase.onAuthStateChanged(auth, (user) => {
                     if (user) {
                         userId = user.uid;
-                        document.getElementById('user-info').textContent = `ID do Usuário: ${userId}`;
+                        document.getElementById('user-info').textContent = `ID del Usuario: ${userId}`; // User ID in Quechua
                         isAuthReady = true;
-                        // Começa a escutar os dados do Firestore assim que autenticado
+                        // Start listening for Firestore data as soon as authenticated
                         setupFirestoreListeners();
-                        updateUI(); // Atualização inicial da UI após autenticação e listeners configurados
+                        updateUI(); // Initial UI update after authentication and listeners configured
                     } else {
                         userId = 'anonymous';
-                        document.getElementById('user-info').textContent = `ID do Usuário: ${userId} (Anônimo)`;
+                        document.getElementById('user-info').textContent = `ID del Usuario: ${userId} (Mana riqsisqa)`; // Anonymous in Quechua
                         isAuthReady = false;
-                        // Limpa os dados locais se o usuário sair ou não estiver autenticado
+                        // Clear local data if the user logs out or is not authenticated
                         ordersData = [];
                         activitiesData = [];
                         attachmentsData = [];
@@ -1149,64 +1150,66 @@
                 });
             } catch (error) {
                 console.error("Erro ao inicializar o Firebase:", error);
-                customAlert("Erro ao inicializar o sistema de banco de dados. Tente novamente mais tarde.");
+                customAlert("Mana allin ruwayta qallarinapaq Firebasewan. Huk kutita qhawariy.", "Atención"); // Error initializing Firebase in Quechua
             }
         }
 
         function setupFirestoreListeners() {
-            // Listener de Pedidos
+            // Orders Listener
             firebase.onSnapshot(getOrdersCollection(), (snapshot) => {
                 ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                updateUI(); // Atualiza a UI sempre que os pedidos mudarem
+                updateUI(); // Update UI whenever orders change
             }, (error) => {
                 console.error("Erro ao buscar pedidos:", error);
-                customAlert("Erro ao carregar pedidos.");
+                customAlert("Mana allin ruwayta mañakuykunata maskanapaq.", "Atención"); // Error fetching orders in Quechua
             });
 
-            // Listener de Atividades
+            // Activities Listener
             firebase.onSnapshot(getActivitiesCollection(), (snapshot) => {
                 activitiesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                updateActivityLog(); // Atualiza o log de atividades sempre que as atividades mudarem
+                updateActivityLog(); // Update activity log whenever activities change
             }, (error) => {
                 console.error("Erro ao buscar atividades:", error);
-                customAlert("Erro ao carregar atividades.");
+                customAlert("Mana allin ruwayta llamkaykunata maskanapaq.", "Atención"); // Error fetching activities in Quechua
             });
 
-            // Listener de Anexos
+            // Attachments Listener
             firebase.onSnapshot(getAttachmentsCollection(), (snapshot) => {
                 attachmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Anexos são atualizados sob demanda para visualizações de pedidos específicas, então não há updateUI global aqui.
+                // Attachments are updated on demand for specific order views, so no global updateUI here.
             }, (error) => {
                 console.error("Erro ao buscar anexos:", error);
-                customAlert("Erro ao carregar anexos.");
+                customAlert("Mana allin ruwayta qillqakunata maskanapaq.", "Atención"); // Error fetching attachments in Quechua
             });
         }
 
-        // Salva dados no Firestore
+        // Save data to Firestore
         async function saveOrderToFirestore(order) {
             if (!isAuthReady) {
-                customAlert('Sistema não autenticado. Tente novamente.');
+                customAlert('Sistema mana riqsisqachu. Huk kutita qhawariy.', "Atención"); // System not authenticated in Quechua
                 return;
             }
             try {
-                const orderRef = firebase.doc(getOrdersCollection(), order.orderNumber);
+                // Corrected to use explicit path segments for firebase.doc
+                const orderRef = firebase.doc(db, 'artifacts', appId, 'users', userId, 'orders', order.orderNumber);
                 await firebase.setDoc(orderRef, order, { merge: true });
             } catch (e) {
                 console.error("Erro ao salvar pedido: ", e);
-                customAlert("Erro ao salvar pedido.");
+                customAlert("Mana allin ruwayta mañakuyta waqaychanapaq.", "Atención"); // Error saving order in Quechua
             }
         }
 
         async function deleteOrderFromFirestore(orderNumber) {
             if (!isAuthReady) {
-                customAlert('Sistema não autenticado. Tente novamente.');
+                customAlert('Sistema mana riqsisqachu. Huk kutita qhawariy.', "Atención"); // System not authenticated in Quechua
                 return;
             }
             try {
-                // Exclui o documento do pedido
-                await firebase.deleteDoc(firebase.doc(getOrdersCollection(), orderNumber));
+                // Delete the order document
+                // Corrected to use explicit path segments for firebase.doc
+                await firebase.deleteDoc(firebase.doc(db, 'artifacts', appId, 'users', userId, 'orders', orderNumber));
 
-                // Exclui os anexos associados
+                // Delete associated attachments
                 const qAttachments = firebase.query(getAttachmentsCollection(), firebase.where("orderNumber", "==", orderNumber));
                 const attachmentDocs = await firebase.getDocs(qAttachments);
                 const batch = firebase.writeBatch(db);
@@ -1215,7 +1218,7 @@
                 });
                 await batch.commit();
 
-                // Exclui as atividades associadas
+                // Delete associated activities
                 const qActivities = firebase.query(getActivitiesCollection(), firebase.where("orderNumber", "==", orderNumber));
                 const activityDocs = await firebase.getDocs(qActivities);
                 const activityBatch = firebase.writeBatch(db);
@@ -1226,7 +1229,7 @@
 
             } catch (e) {
                 console.error("Erro ao excluir pedido: ", e);
-                customAlert("Erro ao excluir pedido.");
+                customAlert("Mana allin ruwayta mañakuyta pichanapaq.", "Atención"); // Error deleting order in Quechua
             }
         }
 
@@ -1246,31 +1249,32 @@
 
         async function addAttachmentToFirestore(attachment) {
             if (!isAuthReady) {
-                customAlert('Sistema não autenticado. Tente novamente.');
+                customAlert('Sistema mana riqsisqachu. Huk kutita qhawariy.', "Atención"); // System not authenticated in Quechua
                 return;
             }
             try {
                 await firebase.addDoc(getAttachmentsCollection(), attachment);
             } catch (e) {
                 console.error("Erro ao anexar arquivo: ", e);
-                customAlert("Erro ao anexar arquivo.");
+                customAlert("Mana allin ruwayta qillqata yapaypaq.", "Atención"); // Error attaching file in Quechua
             }
         }
 
         async function deleteAttachmentFromFirestore(attachmentId) {
             if (!isAuthReady) {
-                customAlert('Sistema não autenticado. Tente novamente.');
+                customAlert('Sistema mana riqsisqachu. Huk kutita qhawariy.', "Atención"); // System not authenticated in Quechua
                 return;
             }
             try {
-                await firebase.deleteDoc(firebase.doc(getAttachmentsCollection(), attachmentId));
+                // Corrected to use explicit path segments for firebase.doc
+                await firebase.deleteDoc(firebase.doc(db, 'artifacts', appId, 'users', userId, 'attachments', attachmentId));
             } catch (e) {
                 console.error("Erro ao excluir anexo: ", e);
-                customAlert("Erro ao excluir anexo.");
+                customAlert("Mana allin ruwayta qillqata pichanapaq.", "Atención"); // Error deleting attachment in Quechua
             }
         }
 
-        // Configura a navegação entre as abas
+        // Configure tab navigation
         function setupTabs() {
             const tabs = document.querySelectorAll('.nav-tabs a');
             tabs.forEach(tab => {
@@ -1280,10 +1284,10 @@
                     tabs.forEach(t => t.classList.remove('active'));
                     document.querySelectorAll('.tab-content').forEach(content => {
                         content.classList.remove('active');
-                        // Redefine os dropdowns na aba que está se tornando inativa
+                        // Reset dropdowns in the tab that is becoming inactive
                         content.querySelectorAll('select.form-control').forEach(select => {
-                            select.value = ''; // Limpa a opção selecionada
-                            // Dispara evento de mudança para ocultar divs de informação associadas
+                            select.value = ''; // Clear selected option
+                            // Trigger change event to hide associated info divs
                             select.dispatchEvent(new Event('change'));
                         });
                     });
@@ -1292,7 +1296,7 @@
                     const target = this.getAttribute('href');
                     document.querySelector(target).classList.add('active');
 
-                    // Quando uma aba é ativada, atualiza seu conteúdo se um pedido estiver selecionado
+                    // When a tab is activated, update its content if an order is selected
                     const activeSelect = document.querySelector(target + ' .form-control');
                     if (activeSelect && activeSelect.tagName === 'SELECT' && activeSelect.value) {
                         activeSelect.dispatchEvent(new Event('change'));
@@ -1303,7 +1307,7 @@
             });
         }
 
-        // Configura os modais
+        // Configure modals
         function setupModals() {
             const modals = document.querySelectorAll('.modal');
             const closeButtons = document.querySelectorAll('.close');
@@ -1323,56 +1327,56 @@
             });
         }
 
-        // Função para abrir um modal
+        // Function to open a modal
         function openModal(modalId) {
             document.getElementById(modalId).classList.add('show');
         }
 
-        // Função para fechar um modal
+        // Function to close a modal
         function closeModal(modalId) {
             const modal = document.getElementById(modalId);
             if (modal) {
                 modal.classList.remove('show');
-                // Tratamento especial para modais de alerta/confirmação personalizados
+                // Special handling for custom alert/confirm modals
                 if (modalId === 'custom-alert-modal' || modalId === 'custom-confirm-modal') {
                     modal.style.opacity = '0';
                     modal.style.pointerEvents = 'none';
-                    // Usa um timeout para garantir que a transição seja concluída antes de definir display como 'none'
+                    // Use a timeout to ensure the transition completes before setting display to 'none'
                     setTimeout(() => {
                         modal.style.display = 'none';
-                    }, 300); // Corresponder esta duração com a duração da transição CSS
+                    }, 300); // Match this duration with the CSS transition duration
                 }
             }
         }
 
-        // Funções para a caixa de alerta/mensagem personalizada
+        // Functions for custom alert/message box
         function setupCustomAlert() {
             document.getElementById('custom-alert-ok-button').addEventListener('click', function() {
                 closeModal('custom-alert-modal');
             });
-            // Garante que o modal esteja inicialmente oculto e estilizado corretamente
+            // Ensure the modal is initially hidden and styled correctly
             const customAlertModal = document.getElementById('custom-alert-modal');
             if (customAlertModal) {
-                customAlertModal.style.display = 'none'; // Garante que esteja oculto inicialmente
+                customAlertModal.style.display = 'none'; // Ensure it's hidden initially
                 customAlertModal.style.opacity = '0';
                 customAlertModal.style.transition = 'opacity 0.3s ease-in-out';
-                customAlertModal.style.pointerEvents = 'none'; // Permite cliques através quando oculto
+                customAlertModal.style.pointerEvents = 'none'; // Allow clicks through when hidden
             }
         }
 
-        function customAlert(message, title = 'Atenção') {
+        function customAlert(message, title = 'Atención') { // Attention in Quechua
             const customAlertModal = document.getElementById('custom-alert-modal');
             document.getElementById('custom-alert-title').textContent = title;
             document.getElementById('custom-alert-message').textContent = message;
 
             if (customAlertModal) {
-                customAlertModal.style.display = 'flex'; // Usa flex para centralizar o conteúdo
+                customAlertModal.style.display = 'flex'; // Use flex to center content
                 customAlertModal.style.opacity = '1';
                 customAlertModal.style.pointerEvents = 'auto';
             }
         }
 
-        // Funções para o modal de confirmação personalizado
+        // Functions for custom confirmation modal
         let confirmOnYesCallback = null;
         let confirmOnNoCallback = null;
 
@@ -1382,8 +1386,8 @@
                     confirmOnYesCallback();
                 }
                 closeModal('custom-confirm-modal');
-                confirmOnYesCallback = null; // Limpa o callback
-                confirmOnNoCallback = null; // Limpa o callback
+                confirmOnYesCallback = null; // Clear callback
+                confirmOnNoCallback = null; // Clear callback
             });
 
             document.getElementById('custom-confirm-no-button').addEventListener('click', function() {
@@ -1391,20 +1395,20 @@
                     confirmOnNoCallback();
                 }
                 closeModal('custom-confirm-modal');
-                confirmOnYesCallback = null; // Limpa o callback
-                confirmOnNoCallback = null; // Limpa o callback
+                confirmOnYesCallback = null; // Clear callback
+                confirmOnNoCallback = null; // Clear callback
             });
 
             const customConfirmModal = document.getElementById('custom-confirm-modal');
             if (customConfirmModal) {
-                customConfirmModal.style.display = 'none'; // Garante que esteja oculto inicialmente
+                customConfirmModal.style.display = 'none'; // Ensure it's hidden initially
                 customConfirmModal.style.opacity = '0';
                 customConfirmModal.style.transition = 'opacity 0.3s ease-in-out';
                 customConfirmModal.style.pointerEvents = 'none';
             }
         }
 
-        function customConfirm(message, title = 'Confirmação', onYes, onNo = null) {
+        function customConfirm(message, title = 'Watuchiy', onYes, onNo = null) { // Confirmation in Quechua
             const customConfirmModal = document.getElementById('custom-confirm-modal');
             document.getElementById('custom-confirm-title').textContent = title;
             document.getElementById('custom-confirm-message').textContent = message;
@@ -1420,14 +1424,14 @@
         }
 
 
-        // Atualiza a UI com base nos dados atuais
+        // Update UI based on current data
         function updateUI() {
             updateOrdersTable();
             updateDepartmentOrderSelects();
             updateActivityLog();
         }
 
-        // Atualiza a tabela de pedidos no painel principal
+        // Update orders table on main panel
         function updateOrdersTable() {
             const tbody = document.getElementById('orders-body');
             tbody.innerHTML = '';
@@ -1470,20 +1474,20 @@
                     }
                 }
 
-                // A ordenação acontece depois que as linhas são adicionadas, então não há necessidade de reaplicar aqui.
+                // Sorting happens after rows are added, so no need to reapply here.
                 // if (prevSortColumn !== -1) {
                 //     currentSortColumn = prevSortColumn;
                 //     sortDirection = prevSortDirection;
                 //     sortTable(prevSortColumn);
                 // }
 
-                let pendencies = 'Nenhuma';
+                let pendencies = 'Mana kanchu'; // None in Quechua
                 if (pendingDepts.length > 0) {
-                    pendencies = 'Pendências: ' + pendingDepts.map(dept => {
+                    pendencies = 'Mana tukusqa: ' + pendingDepts.map(dept => { // Pending in Quechua
                         const deptNames = {
-                            'planning': 'Planejamento', 'purchasing': 'Compras', 'warehouse': 'Estoque',
-                            'mechanics': 'Mecânica', 'electrical': 'Elétrica', 'refrigeration': 'Refrigeração',
-                            'assembly': 'Montagem', 'shipping': 'Expedição', 'logistics': 'Logística', 'invoice': 'Faturamento'
+                            'planning': 'Rurana', 'purchasing': 'Rantiq', 'warehouse': 'Wasi', // Planning, Purchasing, Warehouse in Quechua
+                            'mechanics': 'Mecánica', 'electrical': 'Eléctrica', 'refrigeration': 'Chiriq', // Mechanics, Electrical, Refrigeration in Quechua
+                            'assembly': 'Huñu', 'shipping': 'Apachiy', 'logistics': 'Apachina', 'invoice': 'Qullqi' // Assembly, Shipping, Logistics, Invoice in Quechua
                         };
                         return deptNames[dept] || dept;
                     }).join(', ');
@@ -1501,11 +1505,11 @@
                     <td>${order.invoiceNumber || '-'}</td>
                     <td>${order.freightCompany || '-'}</td>
                     <td>${order.trackingNumber || '-'}</td>
-                    <td><button class="btn btn-sm btn-info view-attachments" data-order="${order.orderNumber}">Ver</button></td>
+                    <td><button class="btn btn-sm btn-info view-attachments" data-order="${order.orderNumber}">Rikuy</button></td> <!-- View in Quechua -->
                     <td>
-                        <button class="btn btn-sm view-order" data-order="${order.orderNumber}">Detalhes</button>
-                        <button class="btn btn-sm btn-danger delete-order" data-order="${order.orderNumber}">Excluir</button>
-                        ${!order.shipmentDate ? `<button class="btn btn-sm btn-success confirm-shipment" data-order="${order.orderNumber}">Enviado</button>` : ''}
+                        <button class="btn btn-sm view-order" data-order="${order.orderNumber}">Imayna</button> <!-- Details in Quechua -->
+                        <button class="btn btn-sm btn-danger delete-order" data-order="${order.orderNumber}">Pichay</button> <!-- Delete in Quechua -->
+                        ${!order.shipmentDate ? `<button class="btn btn-sm btn-success confirm-shipment" data-order="${order.orderNumber}">Apachisqa</button>` : ''} <!-- Sent in Quechua -->
                     </td>
                 `;
 
@@ -1521,7 +1525,7 @@
                 });
             });
 
-            // Adiciona listeners de evento aos botões na tabela
+            // Add event listeners to buttons in the table
             tbody.querySelectorAll('.view-order').forEach(button => {
                 button.addEventListener('click', function() {
                     const orderNumber = this.getAttribute('data-order');
@@ -1549,7 +1553,7 @@
             });
         }
 
-        // Atualiza as seleções de pedidos em todas as abas de departamento
+        // Update order selections in all department tabs
         function updateDepartmentOrderSelects() {
             const selects = [
                 'planning-order', 'purchasing-order', 'warehouse-order',
@@ -1561,7 +1565,7 @@
             selects.forEach(selectId => {
                 const select = document.getElementById(selectId);
                 const currentValue = select.value;
-                select.innerHTML = '<option value="">Selecione um pedido</option>';
+                select.innerHTML = '<option value="">Mañakuyta akllay</option>'; // Select an order in Quechua
 
                 ordersData.forEach(order => {
                     const option = document.createElement('option');
@@ -1583,13 +1587,13 @@
             document.getElementById('import-data').addEventListener('click', () => document.getElementById('file-import').click());
             document.getElementById('file-import').addEventListener('change', importFromExcel);
             document.getElementById('confirm-shipment').addEventListener('click', confirmShipment);
-            document.getElementById('clear-all-data').addEventListener('click', clearAllUserData); // Botão para limpar dados
+            document.getElementById('clear-all-data').addEventListener('click', clearAllUserData); // Button to clear data
         }
 
         async function clearAllUserData() {
-            customConfirm('Tem certeza que deseja apagar TODOS os seus dados (pedidos, atividades, anexos)? Esta ação é irreversível.', 'Apagar Todos os Dados', async () => {
+            customConfirm('Lliw willakuykunata pichayta munankichu (mañakuykuna, llamkaykuna, qillqakuna)? Kay llamkayqa mana kutichiy atiqmi.', 'Lliw Willakuykunata Pichay', async () => { // Confirm clear all data in Quechua
                 if (!isAuthReady) {
-                    customAlert('Sistema não autenticado. Tente novamente.');
+                    customAlert('Sistema mana riqsisqachu. Huk kutita qhawariy.', "Atención"); // System not authenticated in Quechua
                     return;
                 }
                 try {
@@ -1607,10 +1611,10 @@
                         });
                         await batch.commit();
                     }
-                    customAlert('Todos os seus dados foram apagados com sucesso.');
+                    customAlert('Lliw willakuykuna allichasqa pichasqa.', "Atención"); // All data cleared successfully in Quechua
                 } catch (error) {
-                    console.error("Erro ao apagar todos os dados do usuário:", error);
-                    customAlert("Erro ao apagar todos os dados.");
+                    console.error("Error clearing all user data:", error);
+                    customAlert("Mana allin ruwayta lliw willakuykunata pichanapaq.", "Atención"); // Error clearing all data in Quechua
                 }
             });
         }
@@ -1623,18 +1627,18 @@
 
             const handleFile = (e, type) => {
                 const orderNumber = document.getElementById('sales-order').value;
-                if (!orderNumber) { customAlert('Insira o número do pedido primeiro.'); return; }
+                if (!orderNumber) { customAlert('Ñawpaqta mañakuy yupayta churay.', "Atención"); return; } // Enter order number first in Quechua
                 const order = ordersData.find(o => o.orderNumber === orderNumber);
                 if (order) {
                     currentOrder = order;
-                    handleFileUpload(e, 'Vendas', type, 'sales-attachments');
+                    handleFileUpload(e, 'Ranqha', type, 'sales-attachments'); // Sales in Quechua
                 } else {
-                    customAlert('Salve o pedido antes de anexar arquivos.');
+                    customAlert('Qillqakunata yapaypaq mañakuyta waqaychay.', "Atención"); // Save order before attaching files in Quechua
                 }
             };
             document.getElementById('sales-ft-file').addEventListener('change', e => handleFile(e, 'FT'));
-            document.getElementById('sales-desc-file').addEventListener('change', e => handleFile(e, 'Descrição'));
-            document.getElementById('sales-other-file').addEventListener('change', e => handleFile(e, 'Outro'));
+            document.getElementById('sales-desc-file').addEventListener('change', e => handleFile(e, 'Riqsichiy')); // Description in Quechua
+            document.getElementById('sales-other-file').addEventListener('change', e => handleFile(e, 'Huk')); // Other in Quechua
 
             document.getElementById('sales-save').addEventListener('click', saveSalesData);
 
@@ -1651,7 +1655,7 @@
                     document.getElementById('sales-date').value = '';
                     document.getElementById('sales-desired-date').value = '';
                     document.getElementById('products-body').innerHTML = '';
-                    document.getElementById('sales-attachments').innerHTML = '<p>Nenhum anexo.</p>';
+                    document.getElementById('sales-attachments').innerHTML = '<p>Mana qillqakuna kanchu.</p>'; // No attachments in Quechua
                 }
             });
         }
@@ -1666,9 +1670,9 @@
                     currentOrder = order;
                     infoDiv.style.display = 'block';
 
-                    // Preenche a tabela de produtos
+                    // Populate products table
                     const productsBody = document.getElementById('planning-products-body');
-                    productsBody.innerHTML = ''; // Limpa o conteúdo anterior
+                    productsBody.innerHTML = ''; // Clear previous content
                     if (order.products && order.products.length > 0) {
                         order.products.forEach(p => {
                             const row = productsBody.insertRow();
@@ -1676,13 +1680,13 @@
                         });
                     } else {
                         const row = productsBody.insertRow();
-                        row.innerHTML = `<td colspan="3">Nenhum produto encontrado para este pedido.</td>`;
+                        row.innerHTML = `<td colspan="3">Kay mañakuypaq mana imaymana kanchu.</td>`; // No products found for this order in Quechua
                     }
 
-                    // Preenche a tabela de visão geral da BOM
+                    // Populate BOM overview table
                     updateBOMTable('planning-bom-body', order.bom);
 
-                    // Define as datas
+                    // Set dates
                     document.getElementById('planning-desired-date').valueAsDate =
                         order.desiredDeliveryDate ? parseDate(order.desiredDeliveryDate) : null;
 
@@ -1728,7 +1732,7 @@
                 document.getElementById('purchasing-bom-file').click());
 
             document.getElementById('purchasing-bom-file').addEventListener('change', e =>
-                importBOM(e, 'purchasing-bom-body', 'Compras'));
+                importBOM(e, 'purchasing-bom-body', 'Rantiq')); // Purchasing in Quechua
 
             document.getElementById('purchasing-save').addEventListener('click', savePurchasingData);
         }
@@ -1769,38 +1773,38 @@
                     document.getElementById('elec-days').value = data.days || '';
                     document.getElementById('elec-promised-date').valueAsDate = data.promisedDate ? parseDate(data.promisedDate) : null;
                     document.getElementById('elec-notes').value = data.notes || '';
-                    showAttachmentsForOrder('elec-attachments', order.orderNumber, 'Elétrica');
+                    showAttachmentsForOrder('elec-attachments', order.orderNumber, 'Eléctrica'); // Electrical in Quechua
                 } else {
                     currentOrder = null;
                 }
             });
 
             document.getElementById('elec-import-bom').addEventListener('click', () => document.getElementById('elec-bom-file').click());
-            document.getElementById('elec-bom-file').addEventListener('change', e => importBOM(e, 'elec-bom-body', 'Elétrica'));
+            document.getElementById('elec-bom-file').addEventListener('change', e => importBOM(e, 'elec-bom-body', 'Eléctrica')); // Electrical in Quechua
 
             document.getElementById('elec-add-item').addEventListener('click', () => {
-                if (!currentOrder) { customAlert('Selecione um pedido primeiro.'); return; }
+                if (!currentOrder) { customAlert('Ñawpaqta mañakuyta akllay.', "Atención"); return; } // Select an order first in Quechua
 
-                const newItem = { nivel: '', numero: '', componente: '', descricao: '', un: '', quantidade: 1, dataPrometida: '', emEstoque: '0' };
+                const newItem = { nivel: '', numero: '', componente: '', descripcion: '', un: '', cantidad: 1, dataPrometida: '', emEstoque: '0' };
 
                 if (!currentOrder.bom) currentOrder.bom = [];
                 currentOrder.bom.push(newItem);
                 updateBOMTable('elec-bom-body', currentOrder.bom);
-                addActivityToFirestore(currentOrder.orderNumber, 'Elétrica', 'Novo item adicionado à lista de materiais.');
+                addActivityToFirestore(currentOrder.orderNumber, 'Eléctrica', 'Musuq imaymana willakuykunaman yapasqa.'); // New item added to materials list in Quechua
             });
 
             document.getElementById('elec-add-file').addEventListener('click', () => {
-                if(!currentOrder) { customAlert('Selecione um pedido primeiro.'); return; }
+                if(!currentOrder) { customAlert('Ñawpaqta mañakuyta akllay.', "Atención"); return; } // Select an order first in Quechua
                 document.getElementById('elec-file-input').click();
             });
-            document.getElementById('elec-file-input').addEventListener('change', e => handleFileUpload(e, 'Elétrica', 'Arquivo Elétrica', 'elec-attachments'));
+            document.getElementById('elec-file-input').addEventListener('change', e => handleFileUpload(e, 'Eléctrica', 'Qillqa Eléctrica', 'elec-attachments')); // Electrical File in Quechua
 
             document.getElementById('elec-save').addEventListener('click', saveElectricalData);
         }
 
         async function saveSalesData() {
             const orderNumber = document.getElementById('sales-order').value;
-            if (!orderNumber) { customAlert('Insira o número do pedido.'); return; }
+            if (!orderNumber) { customAlert('Mañakuy yupayta churay.', "Atención"); return; } // Enter order number in Quechua
 
             const products = [];
             document.getElementById('products-body').querySelectorAll('tr').forEach(row => {
@@ -1810,13 +1814,13 @@
                     quantity: parseInt(row.querySelector('.product-qty').value) || 1
                 });
             });
-            if (products.length === 0 || !products[0].pn) { customAlert('Adicione ao menos um produto com PN.'); return; }
+            if (products.length === 0 || !products[0].pn) { customAlert('Huk imaymanata PNwan yapay.', "Atención"); return; } // Add at least one product with PN in Quechua
 
             const orderIndex = ordersData.findIndex(o => o.orderNumber === orderNumber);
             let orderData = orderIndex !== -1 ? { ...ordersData[orderIndex] } : {
                 orderNumber,
                 products: [],
-                bom: [], // Inicializa a BOM central
+                bom: [], // Initialize central BOM
                 mechanics: {}, electrical: {}, refrigeration: {}, assembly: {},
                 shipping: {}, logistics: {}, invoice: {}, planning: {}, purchasing: {}, warehouse: {}
             };
@@ -1834,22 +1838,22 @@
             await saveOrderToFirestore(orderData);
 
             if (orderIndex === -1) {
-                await addActivityToFirestore(orderNumber, 'Vendas', 'Pedido criado');
+                await addActivityToFirestore(orderNumber, 'Ranqha', 'Mañakuy kamasqa'); // Order created in Quechua
             } else {
-                await addActivityToFirestore(orderNumber, 'Vendas', 'Pedido atualizado');
+                await addActivityToFirestore(orderNumber, 'Ranqha', 'Mañakuy musuqchasqa'); // Order updated in Quechua
             }
 
-            customAlert(`Pedido ${orderNumber} salvo com sucesso!`);
+            customAlert(`Mañakuy ${orderNumber} allichasqa waqaychasqa!`, "Atención"); // Order saved successfully in Quechua
         }
 
         async function savePlanningData() {
-            if (!currentOrder) { customAlert('Selecione um pedido.'); return; }
+            if (!currentOrder) { customAlert('Mañakuyta akllay.', "Atención"); return; } // Select an order in Quechua
 
             const firstPromised = document.getElementById('planning-first-promised').valueAsDate;
             const secondPromised = document.getElementById('planning-second-promised').valueAsDate;
             const thirdPromised = document.getElementById('planning-third-promised').valueAsDate;
 
-            if (!firstPromised) { customAlert('Preencha a primeira data prometida.'); return; }
+            if (!firstPromised) { customAlert('Ñawpaqta prometisqa p\'unchawta huntachiy.', "Atención"); return; } // Fill in the first promised date in Quechua
 
             currentOrder.firstPromisedDate = firstPromised ? firstPromised.toISOString() : '';
             currentOrder.secondPromisedDate = secondPromised ? secondPromised.toISOString() : '';
@@ -1865,7 +1869,7 @@
                 const latestDate = new Date(Math.max(...dates.filter(d => d && !isNaN(d.getTime()))));
                 currentOrder.currentPromisedDate = latestDate.toISOString();
             } else {
-                currentOrder.currentPromisedDate = ''; // Limpa se não houver datas válidas
+                currentOrder.currentPromisedDate = ''; // Clear if no valid dates
             }
 
             if (!currentOrder.planning) currentOrder.planning = {};
@@ -1873,12 +1877,12 @@
             currentOrder.planning.completed = true;
 
             await saveOrderToFirestore(currentOrder);
-            await addActivityToFirestore(currentOrder.orderNumber, 'Planejamento', 'Datas prometidas atualizadas');
-            customAlert('Dados de planejamento salvos com sucesso!');
+            await addActivityToFirestore(currentOrder.orderNumber, 'Rurana', 'Prometisqa p\'unchawkuna musuqchasqa'); // Promised dates updated in Quechua
+            customAlert('Rurana willakuykuna allichasqa waqaychasqa!', "Atención"); // Planning data saved successfully in Quechua
         }
 
         async function savePurchasingData() {
-            if (!currentOrder || !currentOrder.bom) { customAlert('Selecione um pedido e importe a lista de materiais.'); return; }
+            if (!currentOrder || !currentOrder.bom) { customAlert('Mañakuyta akllay hinaspa imaymana listata apamuy.', "Atención"); return; } // Select an order and import materials list in Quechua
 
             document.getElementById('purchasing-bom-body').querySelectorAll('tr').forEach((row, index) => {
                 if (currentOrder.bom[index]) {
@@ -1891,12 +1895,12 @@
             currentOrder.purchasing.completed = true;
 
             await saveOrderToFirestore(currentOrder);
-            await addActivityToFirestore(currentOrder.orderNumber, 'Compras', 'Lista de materiais e datas de fornecedores atualizadas');
-            customAlert('Dados de compras salvos com sucesso!');
+            await addActivityToFirestore(currentOrder.orderNumber, 'Rantiq', 'Imaymana lista hinaspa apachiq p\'unchawkuna musuqchasqa'); // Materials list and supplier dates updated in Quechua
+            customAlert('Rantiq willakuykuna allichasqa waqaychasqa!', "Atención"); // Purchasing data saved successfully in Quechua
         }
 
         async function saveWarehouseData() {
-            if (!currentOrder || !currentOrder.bom) { customAlert('Selecione um pedido. A lista de materiais deve ser importada primeiro.'); return; }
+            if (!currentOrder || !currentOrder.bom) { customAlert('Mañakuyta akllay. Imaymana lista ñawpaqta apamusqa kanan.', "Atención"); return; } // Select an order. Materials list must be imported first in Quechua
 
             document.getElementById('warehouse-bom-body').querySelectorAll('tr').forEach((row, index) => {
                 if (currentOrder.bom[index]) {
@@ -1909,10 +1913,10 @@
             currentOrder.warehouse.completed = true;
 
             await saveOrderToFirestore(currentOrder);
-            await addActivityToFirestore(currentOrder.orderNumber, 'Estoque', 'Níveis de estoque atualizados');
-            customAlert('Dados de estoque salvos com sucesso!');
+            await addActivityToFirestore(currentOrder.orderNumber, 'Wasi', 'Wasi willakuykuna musuqchasqa'); // Warehouse data updated in Quechua
+            customAlert('Wasi willakuykuna allichasqa waqaychasqa!', "Atención"); // Warehouse data saved successfully in Quechua
 
-            // Renderiza novamente as abas relacionadas se estiverem ativas
+            // Re-render related tabs if active
             if (document.querySelector('#purchasing.active') || document.querySelector('#planning.active')) {
                 document.querySelector('#purchasing-order').dispatchEvent(new Event('change'));
                 document.querySelector('#planning-order').dispatchEvent(new Event('change'));
@@ -1920,7 +1924,7 @@
         }
 
         async function saveElectricalData() {
-            if (!currentOrder) { customAlert('Selecione um pedido.'); return; }
+            if (!currentOrder) { customAlert('Mañakuyta akllay.', "Atención"); return; } // Select an order in Quechua
 
             const newBom = [];
             let hasError = false;
@@ -1930,33 +1934,33 @@
                     nivel: inputs[0].value,
                     numero: inputs[1].value,
                     componente: inputs[2].value,
-                    descricao: inputs[3].value,
+                    descripcion: inputs[3].value,
                     un: inputs[4].value,
-                    quantidade: inputs[5].value,
+                    cantidad: inputs[5].value,
                     dataPrometida: inputs[6].value,
-                    emEstoque: currentOrder.bom.find(b => b.numero === inputs[1].value)?.emEstoque || '0' // Preserva o valor do estoque
+                    emEstoque: currentOrder.bom.find(b => b.numero === inputs[1].value)?.emEstoque || '0' // Preserve stock value
                 };
 
-                if(!item.componente || !item.quantidade) {
+                if(!item.componente || !item.cantidad) {
                     hasError = true;
                 }
                 newBom.push(item);
             });
 
             if (hasError) {
-                customAlert('Todos os itens devem ter pelo menos um Componente e uma Quantidade.');
+                customAlert('Lliw imaymanakuna huk Imaymana hinaspa huk Chanin kanan.', "Atención"); // All items must have at least one Component and a Quantity in Quechua
                 return;
             }
 
             const promisedDate = document.getElementById('elec-promised-date').value;
-            if (!promisedDate) { customAlert('Preencha a data prometida da Elétrica.'); return; }
+            if (!promisedDate) { customAlert('Eléctrica prometisqa p\'unchawta huntachiy.', "Atención"); return; } // Fill in the Electrical promised date in Quechua
 
-            currentOrder.bom = newBom; // Atualiza a BOM no currentOrder
+            currentOrder.bom = newBom; // Update BOM in currentOrder
 
             if (!currentOrder.electrical) currentOrder.electrical = {};
             Object.assign(currentOrder.electrical, {
                 days: parseInt(document.getElementById('elec-days').value) || null,
-                promisedDate: promisedDate ? new Date(promisedDate).toISOString() : '', // Garante uma string de data válida
+                promisedDate: promisedDate ? new Date(promisedDate).toISOString() : '', // Ensure a valid date string
                 notes: document.getElementById('elec-notes').value,
                 completed: true
             });
@@ -1964,8 +1968,8 @@
             updateCurrentPromisedDate(currentOrder);
 
             await saveOrderToFirestore(currentOrder);
-            await addActivityToFirestore(currentOrder.orderNumber, 'Elétrica', 'Lista de materiais e informações atualizadas');
-            customAlert('Dados de elétrica salvos com sucesso!');
+            await addActivityToFirestore(currentOrder.orderNumber, 'Eléctrica', 'Imaymana lista hinaspa willakuykuna musuqchasqa'); // Materials list and information updated in Quechua
+            customAlert('Eléctrica willakuykuna allichasqa waqaychasqa!', "Atención"); // Electrical data saved successfully in Quechua
         }
 
         function importBOM(event, tableBodyId, department) {
@@ -1973,13 +1977,13 @@
             if (!file || !currentOrder) return;
 
             if (currentOrder.bom && currentOrder.bom.length > 0) {
-                customConfirm('Este pedido já possui uma lista de materiais. Deseja substituí-la?', 'Confirmação',
-                    () => { // Callback para Sim
+                customConfirm('Kay mañakuyqa imaymana listatañam charin. Chayta hukwan tikrayta munankichu?', 'Watuchiy', // This order already has a materials list. Do you want to replace it? in Quechua
+                    () => { // Callback for Yes
                         processImportBOM(file, tableBodyId, department);
                     },
-                    () => { // Callback para Não
-                        customAlert('Importação de BOM cancelada.');
-                        event.target.value = ''; // Reseta o input
+                    () => { // Callback for No
+                        customAlert('BOM apamuyta mana tukusqachu.', "Atención"); // BOM import canceled in Quechua
+                        event.target.value = ''; // Reset input
                     }
                 );
             } else {
@@ -1997,7 +2001,7 @@
                     const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
                     if (jsonData.length === 0) {
-                        customAlert('O arquivo não contém dados válidos.');
+                        customAlert('Qillqaqa mana allin willakuykunata charinchu.', "Atención"); // File does not contain valid data in Quechua
                         return;
                     }
 
@@ -2005,9 +2009,9 @@
                         nivel: item['Nivel']?.toString() || '',
                         numero: item['N°']?.toString() || '',
                         componente: item['Componente']?.toString() || '',
-                        descricao: item['Descrição']?.toString() || '',
+                        descripcion: item['Descripción']?.toString() || '',
                         un: item['UN']?.toString() || '',
-                        quantidade: item['Quantidade']?.toString() || '1',
+                        cantidad: item['Cantidad']?.toString() || '1',
                         emEstoque: item['Em Estoque']?.toString() || '0',
                         dataPrometida: item['Data Prometida'] ? parseDate(item['Data Prometida'])?.toISOString() : '',
                         dataPrometidaFornecedor: item['Data Prometida Fornecedor'] ? parseDate(item['Data Prometida Fornecedor'])?.toISOString() : ''
@@ -2020,26 +2024,26 @@
                     currentOrder.purchasing.completed = true;
 
                     await saveOrderToFirestore(currentOrder);
-                    await addActivityToFirestore(currentOrder.orderNumber, department, `Lista de materiais importada: ${file.name}`);
-                    customAlert(`Lista de materiais importada com sucesso! ${bom.length} itens encontrados.`);
+                    await addActivityToFirestore(currentOrder.orderNumber, department, `Imaymana lista apamusqa: ${file.name}`); // Materials list imported in Quechua
+                    customAlert(`Imaymana lista allichasqa apamusqa! ${bom.length} imaymanakuna tarisqa.`, "Atención"); // Materials list imported successfully! X items found in Quechua
                 } catch (error) {
                     console.error('Erro ao importar BOM:', error);
-                    customAlert('Erro ao importar o arquivo. Verifique o formato do arquivo.');
+                    customAlert('Mana allin ruwayta BOM apaypaq. Qillqa imaynata qhawariy.', "Atención"); // Error importing BOM. Check file format in Quechua
                 }
             };
             reader.readAsArrayBuffer(file);
-            // event.target.value = ''; // Reseta o input tratado no callback de confirmação
+            // event.target.value = ''; // Reset input handled in confirmation callback
         }
 
         function updateBOMTable(tableBodyId, bom) {
             const tbody = document.getElementById(tableBodyId);
-            tbody.innerHTML = ''; // Limpa o conteúdo anterior
+            tbody.innerHTML = ''; // Clear previous content
 
-            // Lida com casos em que a BOM é nula, indefinida ou vazia
+            // Handle cases where BOM is null, undefined, or empty
             if (!bom || bom.length === 0) {
                 const colSpan = (tableBodyId === 'elec-bom-body') ? 8 : (tableBodyId === 'warehouse-bom-body') ? 7 : 9;
                 const row = tbody.insertRow();
-                row.innerHTML = `<td colspan="${colSpan}" style="text-align: center;">A Lista de Materiais (BOM) ainda não foi importada para este pedido.</td>`;
+                row.innerHTML = `<td colspan="${colSpan}" style="text-align: center;">Imaymana Lista (BOM) kay mañakuypaq mana apamusqachu.</td>`; // Materials List (BOM) not yet imported for this order in Quechua
                 return;
             }
 
@@ -2051,9 +2055,9 @@
                         <td><input type="text" class="form-control" value="${item.nivel || ''}"></td>
                         <td><input type="text" class="form-control" value="${item.numero || ''}"></td>
                         <td><input type="text" class="form-control" value="${item.componente || ''}"></td>
-                        <td><input type="text" class="form-control" value="${item.descricao || ''}"></td>
+                        <td><input type="text" class="form-control" value="${item.descripcion || ''}"></td>
                         <td><input type="text" class="form-control" value="${item.un || ''}"></td>
-                        <td><input type="number" class="form-control" min="1" value="${item.quantidade || 1}"></td>
+                        <td><input type="number" class="form-control" min="1" value="${item.cantidad || 1}"></td>
                         <td><input type="date" class="form-control" value="${formatDateForInput(item.dataPrometida)}"></td>
                         <td><button class="btn btn-sm btn-danger remove-item">X</button></td>
                     `;
@@ -2062,14 +2066,14 @@
                         if(itemIndex > -1) {
                             currentOrder.bom.splice(itemIndex, 1);
                             await saveOrderToFirestore(currentOrder);
-                            await addActivityToFirestore(currentOrder.orderNumber, 'Elétrica', `Item ${item.componente} removido.`);
-                            updateBOMTable('elec-bom-body', currentOrder.bom); // Renderiza novamente a tabela após a remoção
+                            await addActivityToFirestore(currentOrder.orderNumber, 'Eléctrica', `Imaymana ${item.componente} pichasqa.`); // Item removed in Quechua
+                            updateBOMTable('elec-bom-body', currentOrder.bom); // Re-render table after removal
                         }
                     });
 
                 } else if (tableBodyId === 'planning-bom-body') {
                     const numMachines = (currentOrder.products || []).reduce((sum, p) => sum + (parseInt(p.quantity, 10) || 0), 0) || 1;
-                    const quantidadeNecessaria = parseFloat(item.quantidade) || 0;
+                    const quantidadeNecessaria = parseFloat(item.cantidad) || 0;
                     const emEstoque = parseFloat(item.emEstoque) || 0;
                     const suggestedQty = Math.max(0, (numMachines * quantidadeNecessaria) - emEstoque);
 
@@ -2077,7 +2081,7 @@
                         <td>${item.nivel || '-'}</td>
                         <td>${item.numero || '-'}</td>
                         <td>${item.componente || '-'}</td>
-                        <td>${item.descricao || '-'}</td>
+                        <td>${item.descripcion || '-'}</td>
                         <td>${item.un || '-'}</td>
                         <td>${quantidadeNecessaria}</td>
                         <td>${emEstoque}</td>
@@ -2086,7 +2090,7 @@
                     `;
                 } else if (tableBodyId === 'purchasing-bom-body') {
                     const numMachines = (currentOrder.products || []).reduce((sum, p) => sum + (parseInt(p.quantity, 10) || 0), 0) || 1;
-                    const quantidadeNecessaria = parseFloat(item.quantidade) || 0;
+                    const quantidadeNecessaria = parseFloat(item.cantidad) || 0;
                     const emEstoque = parseFloat(item.emEstoque) || 0;
                     const suggestedQty = Math.max(0, (numMachines * quantidadeNecessaria) - emEstoque);
 
@@ -2094,7 +2098,7 @@
                         <td>${item.nivel || ''}</td>
                         <td>${item.numero || ''}</td>
                         <td>${item.componente || ''}</td>
-                        <td>${item.descricao || ''}</td>
+                        <td>${item.descripcion || ''}</td>
                         <td>${item.un || ''}</td>
                         <td>${quantidadeNecessaria}</td>
                         <td>${emEstoque}</td>
@@ -2107,9 +2111,9 @@
                         <td>${item.nivel || ''}</td>
                         <td>${item.numero || ''}</td>
                         <td>${item.componente || ''}</td>
-                        <td>${item.descricao || ''}</td>
+                        <td>${item.descripcion || ''}</td>
                         <td>${item.un || ''}</td>
-                        <td>${item.quantidade || ''}</td>
+                        <td>${item.cantidad || ''}</td>
                         <td><input type="number" class="form-control" min="0" value="${item.emEstoque || 0}"></td>
                     `;
                 }
@@ -2117,11 +2121,11 @@
         }
 
         function deleteOrder(orderNumber) {
-            customConfirm(`Tem certeza que deseja excluir o pedido ${orderNumber}? Esta ação não pode ser desfeita.`, 'Confirmação',
-                async () => { // Callback para Sim
+            customConfirm(`Mañakuy ${orderNumber} pichayta munankichu? Kay llamkayqa mana kutichiy atiqmi.`, 'Watuchiy', // Do you want to delete order X? This action cannot be undone in Quechua
+                async () => { // Callback for Yes
                     await deleteOrderFromFirestore(orderNumber);
-                    await addActivityToFirestore(orderNumber, 'Sistema', `Pedido ${orderNumber} excluído`);
-                    customAlert(`Pedido ${orderNumber} excluído com sucesso.`);
+                    await addActivityToFirestore(orderNumber, 'Sistema', `Mañakuy ${orderNumber} pichasqa`); // Order deleted in Quechua
+                    customAlert(`Mañakuy ${orderNumber} allichasqa pichasqa.`, "Atención"); // Order deleted successfully in Quechua
                 }
             );
         }
@@ -2132,13 +2136,13 @@
 
             const sortedActivities = [...activitiesData].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-            sortedActivities.slice(0, 100).forEach(activity => { // Limita as entradas do log para desempenho
+            sortedActivities.slice(0, 100).forEach(activity => { // Limit log entries for performance
                 const entry = document.createElement('div');
                 entry.className = 'log-entry';
                 entry.innerHTML = `
                     <strong>${formatDateTime(activity.timestamp)}</strong> -
-                    Pedido: ${activity.orderNumber} -
-                    Departamento: ${activity.department} -
+                    Mañakuy: ${activity.orderNumber} -
+                    Tupuy: ${activity.department} -
                     ${activity.action}
                 `;
                 logContainer.appendChild(entry);
@@ -2175,33 +2179,33 @@
             const content = document.getElementById('modal-order-content');
             const ganttContainer = document.querySelector('#order-modal .gantt-container');
 
-            title.textContent = `Detalhes do Pedido ${order.orderNumber}`;
+            title.textContent = `Mañakuy Imaynakuna ${order.orderNumber}`; // Order Details in Quechua
 
             let html = `
                 <div class="order-details">
-                    <h3>Informações Básicas</h3>
-                    <p><strong>Cliente:</strong> ${order.customer}</p>
-                    <p><strong>Data do Pedido:</strong> ${formatDate(order.orderDate)}</p>
-                    <p><strong>Data Desejada:</strong> ${formatDate(order.desiredDeliveryDate)}</p>
-                    <p><strong>Primeira Data Prometida:</strong> ${formatDate(order.firstPromisedDate)}</p>
-                    <p><strong>Data Prometida Atual:</strong> ${formatDate(order.currentPromisedDate)}</p>
+                    <h3>Sapsi Willakuykuna</h3> <!-- Basic Information in Quechua -->
+                    <p><strong>Rantiq:</strong> ${order.customer}</p> <!-- Customer in Quechua -->
+                    <p><strong>Mañakuy P'unchaw:</strong> ${formatDate(order.orderDate)}</p> <!-- Order Date in Quechua -->
+                    <p><strong>Munasqa Apachiy P'unchaw:</strong> ${formatDate(order.desiredDeliveryDate)}</p> <!-- Desired Delivery Date in Quechua -->
+                    <p><strong>Ñawpaq Prometisqa P'unchaw:</strong> ${formatDate(order.firstPromisedDate)}</p> <!-- First Promised Date in Quechua -->
+                    <p><strong>Kunan Prometisqa P'unchaw:</strong> ${formatDate(order.currentPromisedDate)}</p> <!-- Current Promised Date in Quechua -->
 
-                    <h3>Produtos</h3>
-                    <table><thead><tr><th>PN</th><th>Descrição</th><th>Quantidade</th></tr></thead><tbody>`;
+                    <h3>Imaymanakuna</h3> <!-- Products in Quechua -->
+                    <table><thead><tr><th>PN</th><th>Riqsichiy</th><th>Chanin</th></tr></thead><tbody>`; // PN, Description, Quantity in Quechua
             (order.products || []).forEach(p => { html += `<tr><td>${p.pn}</td><td>${p.description || '-'}</td><td>${p.quantity}</td></tr>`; });
             html += `</tbody></table>
 
-                    <h3>Status por Departamento</h3>
-                    <table><thead><tr><th>Departamento</th><th>Status</th><th>Data Prometida</th><th>Notas</th></tr></thead><tbody>`;
+                    <h3>Tupuykuna Imayna</h3> <!-- Status by Department in Quechua -->
+                    <table><thead><tr><th>Tupuy</th><th>Imayna</th><th>Prometisqa P'unchaw</th><th>Willakuykuna</th></tr></thead><tbody>`; // Department, Status, Promised Date, Notes in Quechua
             const departments = [
-                { id: 'planning', name: 'Planejamento'}, { id: 'purchasing', name: 'Compras' }, { id: 'warehouse', name: 'Estoque'},
-                { id: 'mechanics', name: 'Mecânica' }, { id: 'electrical', name: 'Elétrica' },
-                { id: 'refrigeration', name: 'Refrigeração' }, { id: 'assembly', name: 'Montagem' },
-                { id: 'shipping', name: 'Expedição' }, { id: 'logistics', 'name': 'Logística' }, { id: 'invoice', name: 'Faturamento' }
+                { id: 'planning', name: 'Rurana'}, { id: 'purchasing', name: 'Rantiq' }, { id: 'warehouse', name: 'Wasi'},
+                { id: 'mechanics', name: 'Mecánica' }, { id: 'electrical', name: 'Eléctrica' },
+                { id: 'refrigeration', name: 'Chiriq' }, { id: 'assembly', name: 'Huñu' },
+                { id: 'shipping', name: 'Apachiy' }, { id: 'logistics', 'name': 'Apachina' }, { id: 'invoice', name: 'Qullqi' }
             ];
             departments.forEach(dept => {
                 const deptData = order[dept.id] || {};
-                html += `<tr><td>${dept.name}</td><td>${deptData.completed ? 'Concluído' : 'Pendente'}</td><td>${formatDate(deptData.promisedDate)}</td><td>${deptData.notes || '-'}</td></tr>`;
+                html += `<tr><td>${dept.name}</td><td>${deptData.completed ? 'Tukusqa' : 'Mana tukusqa'}</td><td>${formatDate(deptData.promisedDate)}</td><td>${deptData.notes || '-'}</td></tr>`; // Completed, Pending in Quechua
             });
             html += `</tbody></table></div>`;
 
@@ -2210,7 +2214,7 @@
 
             renderGanttChart('modal-gantt-chart', order);
 
-            // Garante que o modal seja exibido
+            // Ensure modal is displayed
             openModal('order-modal');
         }
 
@@ -2223,22 +2227,22 @@
             const content = document.getElementById('modal-order-content');
             const ganttContainer = document.querySelector('#order-modal .gantt-container');
 
-            title.textContent = `Anexos do Pedido ${order.orderNumber}`;
+            title.textContent = `Mañakuy Qillqakuna ${order.orderNumber}`; // Order Attachments in Quechua
 
             let html = '<div class="attachments-container">';
             const orderAttachments = attachmentsData.filter(a => a.orderNumber === orderNumber);
 
             if (orderAttachments.length === 0) {
-                html += '<p>Nenhum anexo encontrado para este pedido.</p>';
+                html += '<p>Mana qillqakuna kanchu kay mañakuypaq.</p>'; // No attachments found for this order in Quechua
             } else {
                 orderAttachments.forEach(attachment => {
                     html += `
                         <div class="attachment-item">
                             <h4>${attachment.name}</h4>
-                            <p>Dept: ${attachment.department}</p>
+                            <p>Tupuy: ${attachment.department}</p> <!-- Dept in Quechua -->
                             <div class="attachment-actions">
-                                <button class="btn btn-sm download-attachment" data-id="${attachment.id}">Download</button>
-                                <button class="btn btn-sm btn-danger delete-attachment" data-id="${attachment.id}">Excluir</button>
+                                <button class="btn btn-sm download-attachment" data-id="${attachment.id}">Uraychay</button> <!-- Download in Quechua -->
+                                <button class="btn btn-sm btn-danger delete-attachment" data-id="${attachment.id}">Pichay</button> <!-- Delete in Quechua -->
                             </div>
                         </div>`;
                 });
@@ -2277,13 +2281,13 @@
         }
 
         async function deleteAttachment(attachmentId, orderNumber) {
-            customConfirm('Tem certeza que deseja excluir este anexo?', 'Confirmação',
-                async () => { // Callback para Sim
+            customConfirm('Kay qillqata pichayta munankichu?', 'Watuchiy', // Do you want to delete this attachment? in Quechua
+                async () => { // Callback for Yes
                     const deletedAttachment = attachmentsData.find(a => a.id === attachmentId);
                     await deleteAttachmentFromFirestore(attachmentId);
-                    showAttachments(orderNumber); // Atualiza a visualização
-                    await addActivityToFirestore(orderNumber, 'Sistema', `Anexo ${deletedAttachment.name} excluído`);
-                    customAlert(`Anexo "${deletedAttachment.name}" excluído com sucesso.`);
+                    showAttachments(orderNumber); // Update view
+                    await addActivityToFirestore(orderNumber, 'Sistema', `Qillqa ${deletedAttachment.name} pichasqa`); // Attachment deleted in Quechua
+                    customAlert(`Qillqa "${deletedAttachment.name}" allichasqa pichasqa.`, "Atención"); // Attachment deleted successfully in Quechua
                 }
             );
         }
@@ -2325,46 +2329,46 @@
 
         function exportToExcel() {
             const exportData = ordersData.map(order => ({
-                'Nº Pedido': order.orderNumber,
-                'Data Pedido': formatDate(order.orderDate),
-                'Data Desejada': formatDate(order.desiredDeliveryDate),
-                'Cliente': order.customer,
-                'Produtos': (order.products || []).map(p => `${p.pn} (${p.quantity}x)`).join('; '),
+                'Nº Mañakuy': order.orderNumber, // Order No. in Quechua
+                'Mañakuy P\'unchaw': formatDate(order.orderDate), // Order Date in Quechua
+                'Munasqa Apachiy P\'unchaw': formatDate(order.desiredDeliveryDate), // Desired Delivery Date in Quechua
+                'Rantiq': order.customer, // Customer in Quechua
+                'Imaymanakuna': (order.products || []).map(p => `${p.pn} (${p.quantity}x)`).join('; '), // Products in Quechua
             }));
             const ws = XLSX.utils.json_to_sheet(exportData);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Pedidos');
-            XLSX.writeFile(wb, 'pedidos_exportados.xlsx');
+            XLSX.utils.book_append_sheet(wb, ws, 'Mañakuykuna'); // Orders in Quechua
+            XLSX.writeFile(wb, 'mañakuykuna_exportasqa.xlsx'); // exported_orders.xlsx in Quechua
         }
 
         function parseDate(dateString) {
             if (!dateString) return null;
-            // Se já for um objeto Date, retorna-o
+            // If it's already a Date object, return it
             if (dateString instanceof Date && !isNaN(dateString)) return dateString;
 
-            // Lida com data numérica do Excel (dias desde 1900)
+            // Handle numeric date from Excel (days since 1900)
             if (typeof dateString === 'number') {
                 return new Date(Math.round((dateString - 25569) * 86400 * 1000));
             }
 
             if (typeof dateString !== 'string') return null;
 
-            // Tenta analisar como string ISO primeiro (do Firestore)
+            // Try to parse as ISO string first (from Firestore)
             const isoDate = new Date(dateString);
             if (!isNaN(isoDate.getTime())) return isoDate;
 
-            // Lida com formato de data brasileiro (dd/mm/yyyy)
+            // Handle Brazilian date format (dd/mm/yyyy)
             let parts = dateString.match(/^(\d{1,2})[.\/\-](\d{1,2})[.\/\-](\d{2,4})$/);
             if (parts) {
                 const day = parseInt(parts[1], 10);
-                const month = parseInt(parts[2], 10) - 1; // Mês é baseado em 0
+                const month = parseInt(parts[2], 10) - 1; // Month is 0-based
                 let year = parseInt(parts[3], 10);
-                if (year < 100) year += 2000; // Lida com anos de 2 dígitos
-                const date = new Date(Date.UTC(year, month, day)); // Usa UTC para evitar problemas de fuso horário
+                if (year < 100) year += 2000; // Handle 2-digit years
+                const date = new Date(Date.UTC(year, month, day)); // Use UTC to avoid timezone issues
                 if (!isNaN(date.getTime())) return date;
             }
 
-            // Fallback para o construtor Date genérico
+            // Fallback to generic Date constructor
             const genericDate = new Date(dateString);
             if (!isNaN(genericDate.getTime())) return genericDate;
 
@@ -2376,13 +2380,13 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            customConfirm('Deseja importar os dados do Excel? Pedidos duplicados serão ignorados.', 'Importar Dados',
-                () => { // Callback para Sim
+            customConfirm('Excel willakuykunata apayta munankichu? Iskaychasqa mañakuykuna mana qhawasqachu kanqa.', 'Willakuykunata Apay', // Do you want to import Excel data? Duplicate orders will be ignored in Quechua
+                () => { // Callback for Yes
                     processImportFromExcel(file);
                 },
-                () => { // Callback para Não
-                    customAlert('Importação de dados cancelada.');
-                    event.target.value = ''; // Reseta o input
+                () => { // Callback for No
+                    customAlert('Willakuy apayta mana tukusqachu.', "Atención"); // Data import canceled in Quechua
+                    event.target.value = ''; // Reset input
                 }
             );
         }
@@ -2429,9 +2433,10 @@
                                 purchasing: {}, warehouse: {}
                             };
 
-                            const orderRef = firebase.doc(getOrdersCollection(), newOrder.orderNumber);
+                            // Corrected to use explicit path segments for firebase.doc
+                            const orderRef = firebase.doc(db, 'artifacts', appId, 'users', userId, 'orders', newOrder.orderNumber);
                             batch.set(orderRef, newOrder);
-                            await addActivityToFirestore(newOrder.orderNumber, 'Sistema', 'Pedido importado');
+                            await addActivityToFirestore(newOrder.orderNumber, 'Sistema', 'Mañakuy apamusqa'); // Order imported in Quechua
                             importedCount++;
                         } catch (rowError) {
                             console.error(`Erro ao processar linha:`, rowError);
@@ -2442,10 +2447,10 @@
 
                 } catch (fileError) {
                     console.error('Erro ao importar arquivo Excel:', fileError);
-                    customAlert('Erro ao importar o arquivo. Verifique o formato do arquivo.');
+                    customAlert('Mana allin ruwayta Excel qillqata apaypaq. Qillqa imaynata qhawariy.', "Atención"); // Error importing Excel file. Check file format in Quechua
                     return;
                 }
-                customAlert(`Importação concluída.\n${importedCount} novos pedidos importados.\n${skippedCount} pedidos ignorados (inválidos, duplicados ou com erros).`);
+                customAlert(`Apay tukusqa.\n${importedCount} musuq mañakuykuna apamusqa.\n${skippedCount} mañakuykuna mana qhawasqachu (mana allin, iskaychasqa utaq pantaykunawan).`, "Atención"); // Import complete. X new orders imported. Y orders skipped (invalid, duplicate or with errors) in Quechua
             };
             reader.readAsArrayBuffer(file);
         }
@@ -2474,7 +2479,7 @@
 
             document.getElementById('products-body').innerHTML = '';
             (order.products || []).forEach(p => addProductRow(p));
-            showAttachmentsForOrder('sales-attachments', order.orderNumber, 'Vendas');
+            showAttachmentsForOrder('sales-attachments', order.orderNumber, 'Ranqha'); // Sales in Quechua
         }
 
         function initDepartmentTab(dept) {
@@ -2494,23 +2499,23 @@
                 }
             });
             document.getElementById(`${dept.id}-add-file`).addEventListener('click', () => {
-                if(!currentOrder) { customAlert('Selecione um pedido primeiro.'); return; }
+                if(!currentOrder) { customAlert('Ñawpaqta mañakuyta akllay.', "Atención"); return; } // Select an order first in Quechua
                 document.getElementById(`${dept.id}-file-input`).click();
             });
-            document.getElementById(`${dept.id}-file-input`).addEventListener('change', e => handleFileUpload(e, dept.name, `Arquivo ${dept.name}`, `${dept.id}-attachments`));
+            document.getElementById(`${dept.id}-file-input`).addEventListener('change', e => handleFileUpload(e, dept.name, `Qillqa ${dept.name}`, `${dept.id}-attachments`)); // File Dept Name in Quechua
             document.getElementById(`${dept.id}-save`).addEventListener('click', () => saveDepartmentData(dept));
         }
 
         async function saveDepartmentData(dept) {
-            if (!currentOrder) { customAlert('Selecione um pedido.'); return; }
+            if (!currentOrder) { customAlert('Mañakuyta akllay.', "Atención"); return; } // Select an order in Quechua
 
             const promisedDate = document.getElementById(`${dept.id}-promised-date`).value;
-            if (!promisedDate) { customAlert(`Preencha a data prometida para ${dept.name}.`); return; }
+            if (!promisedDate) { customAlert(`${dept.name} prometisqa p\'unchawta huntachiy.`, "Atención"); return; } // Fill in the promised date for Dept Name in Quechua
 
             if(!currentOrder[dept.id]) currentOrder[dept.id] = {};
 
             currentOrder[dept.id].days = parseInt(document.getElementById(`${dept.id}-days`).value) || null;
-            currentOrder[dept.id].promisedDate = promisedDate ? new Date(promisedDate).toISOString() : ''; // Garante uma string de data válida
+            currentOrder[dept.id].promisedDate = promisedDate ? new Date(promisedDate).toISOString() : ''; // Ensure a valid date string
             currentOrder[dept.id].notes = document.getElementById(`${dept.id}-notes`).value;
             currentOrder[dept.id].completed = true;
 
@@ -2518,26 +2523,26 @@
 
             if(dept.id === 'assembly' && ['mechanics', 'electrical', 'refrigeration', 'assembly'].every(d => currentOrder[d]?.completed)) {
                 currentOrder.dateReady = new Date().toISOString();
-                await addActivityToFirestore(currentOrder.orderNumber, 'Montagem', 'Pronto para expedição');
+                await addActivityToFirestore(currentOrder.orderNumber, 'Huñu', 'Apachiyta tukusqa'); // Ready for shipment in Quechua
             }
 
             await saveOrderToFirestore(currentOrder);
-            await addActivityToFirestore(currentOrder.orderNumber, dept.name, 'Informações atualizadas');
-            customAlert(`Dados de ${dept.name} salvos com sucesso!`);
+            await addActivityToFirestore(currentOrder.orderNumber, dept.name, 'Willakuykuna musuqchasqa'); // Information updated in Quechua
+            customAlert(`${dept.name} willakuykuna allichasqa waqaychasqa!`, "Atención"); // Dept Name data saved successfully in Quechua
         }
 
-        function initMechanicsTab() { initDepartmentTab({id: 'mech', name: 'Mecânica'}); }
-        function initRefrigerationTab() { initDepartmentTab({id: 'refrig', name: 'Refrigeração'}); }
-        function initAssemblyTab() { initDepartmentTab({id: 'assembly', name: 'Montagem'}); }
+        function initMechanicsTab() { initDepartmentTab({id: 'mech', name: 'Mecánica'}); } // Mechanics in Quechua
+        function initRefrigerationTab() { initDepartmentTab({id: 'refrig', name: 'Chiriq'}); } // Refrigeration in Quechua
+        function initAssemblyTab() { initDepartmentTab({id: 'assembly', name: 'Huñu'}); } // Assembly in Quechua
 
         function updateCurrentPromisedDate(order) {
             const departmentDates = ['mechanics', 'electrical', 'refrigeration', 'assembly']
                 .map(d => order[d]?.promisedDate ? parseDate(order[d].promisedDate) : null)
-                .filter(d => d && !isNaN(d.getTime())); // Filtra datas inválidas
+                .filter(d => d && !isNaN(d.getTime())); // Filter invalid dates
 
             const planningDates = [
                 order.firstPromisedDate, order.secondPromisedDate, order.thirdPromisedDate
-            ].filter(d => d).map(d => parseDate(d)).filter(d => d && !isNaN(d.getTime())); // Filtra datas inválidas
+            ].filter(d => d).map(d => parseDate(d)).filter(d => d && !isNaN(d.getTime())); // Filter invalid dates
 
             const allDates = [...departmentDates, ...planningDates];
 
@@ -2545,7 +2550,7 @@
                 const latestDate = new Date(Math.max.apply(null, allDates));
                 order.currentPromisedDate = latestDate.toISOString();
             } else {
-                order.currentPromisedDate = ''; // Limpa se não houver datas válidas
+                order.currentPromisedDate = ''; // Clear if no valid dates
             }
         }
 
@@ -2562,7 +2567,7 @@
                     if (data.packages) {
                         data.packages.forEach(p => addPackageRow(p));
                     }
-                    showAttachmentsForOrder('shipping-attachments', order.orderNumber, 'Expedição');
+                    showAttachmentsForOrder('shipping-attachments', order.orderNumber, 'Apachiy'); // Shipping in Quechua
                 } else {
                     currentOrder = null;
                 }
@@ -2570,10 +2575,10 @@
 
             document.getElementById('add-package').addEventListener('click', () => addPackageRow());
             document.getElementById('shipping-add-file').addEventListener('click', () => {
-                if(!currentOrder) { customAlert('Selecione um pedido primeiro.'); return; }
+                if(!currentOrder) { customAlert('Ñawpaqta mañakuyta akllay.', "Atención"); return; } // Select an order first in Quechua
                 document.getElementById('shipping-file-input').click();
             });
-            document.getElementById('shipping-file-input').addEventListener('change', e => handleFileUpload(e, 'Expedição', 'Arquivo Expedição', 'shipping-attachments'));
+            document.getElementById('shipping-file-input').addEventListener('change', e => handleFileUpload(e, 'Apachiy', 'Qillqa Apachiy', 'shipping-attachments')); // Shipping File in Quechua
             document.getElementById('shipping-save').addEventListener('click', saveShippingData);
         }
 
@@ -2596,13 +2601,13 @@
         }
 
         let currentSortColumn = -1;
-        let sortDirection = 1; // 1 para ascendente, -1 para descendente
+        let sortDirection = 1; // 1 for ascending, -1 for descending
 
         function sortTable(columnIndex) {
             const tbody = document.getElementById('orders-body');
             const rows = Array.from(tbody.querySelectorAll('tr'));
 
-            // Alterna a direção se clicar na mesma coluna
+            // Toggle direction if clicking on the same column
             if (currentSortColumn === columnIndex) {
                 sortDirection *= -1;
             } else {
@@ -2610,14 +2615,14 @@
                 sortDirection = 1;
             }
 
-            // Atualiza as setas do cabeçalho
+            // Update header arrows
             updateSortHeaders(columnIndex);
 
             rows.sort((a, b) => {
                 const aValue = a.cells[columnIndex].textContent.trim();
                 const bValue = b.cells[columnIndex].textContent.trim();
 
-                // Tratamento especial para colunas de data (1,2,4,5,8,9)
+                // Special handling for date columns (1,2,4,5,8,9)
                 if ([1, 2, 4, 5, 8, 9].includes(columnIndex)) {
                     const aDate = parseDateFromDisplay(aValue);
                     const bDate = parseDateFromDisplay(bValue);
@@ -2628,19 +2633,19 @@
                     return 0;
                 }
 
-                // Tratamento especial para colunas numéricas (6) - Nota: no original, esta era 'Dias Atraso', que não é uma coluna direta na nova tabela. Reavaliar se necessário.
-                // Por enquanto, assumindo que a coluna 6 não é numérica para ordenação.
+                // Special handling for numeric columns (6) - Note: in the original, this was 'Days Delay', which is not a direct column in the new table. Re-evaluate if necessary.
+                // For now, assuming column 6 is not numeric for sorting.
                 // if (columnIndex === 6) {
                 //     const aNum = parseFloat(aValue) || 0;
                 //     const bNum = parseFloat(bValue) || 0;
                 //     return (aNum - bNum) * sortDirection;
                 // }
 
-                // Comparação de string padrão
+                // Standard string comparison
                 return aValue.localeCompare(bValue) * sortDirection;
             });
 
-            // Reconstrói a tabela
+            // Rebuild the table
             tbody.innerHTML = '';
             rows.forEach(row => tbody.appendChild(row));
         }
@@ -2648,7 +2653,7 @@
         function parseDateFromDisplay(dateString) {
             if (!dateString || dateString === '-') return null;
 
-            // Lida com formato de data brasileiro (dd/mm/yyyy)
+            // Handle Brazilian date format (dd/mm/yyyy)
             const parts = dateString.split('/');
             if (parts.length === 3) {
                 return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
@@ -2661,10 +2666,10 @@
             const headers = document.querySelectorAll('#orders-table th');
 
             headers.forEach((header, index) => {
-                // Remove todas as setas
+                // Remove all arrows
                 header.innerHTML = header.innerHTML.replace(/ ▲| ▼/g, '');
 
-                // Adiciona seta à coluna ativa
+                // Add arrow to active column
                 if (index === activeColumn) {
                     header.innerHTML += sortDirection === 1 ? ' ▲' : ' ▼';
                 }
@@ -2672,7 +2677,7 @@
         }
 
         async function saveShippingData() {
-            if (!currentOrder) { customAlert('Selecione um pedido.'); return; }
+            if (!currentOrder) { customAlert('Mañakuyta akllay.', "Atención"); return; } // Select an order in Quechua
 
             const packages = [];
             document.getElementById('packages-body').querySelectorAll('tr').forEach(row => {
@@ -2685,7 +2690,7 @@
             });
 
             if (packages.some(p => isNaN(p.length) || isNaN(p.width) || isNaN(p.height) || isNaN(p.weight))) {
-                customAlert('Preencha todos os campos dos volumes com números válidos.');
+                customAlert('Lliw volumenkunapa imaynanankunata allin yupaykunawan huntachiy.', "Atención"); // Fill in all package dimensions with valid numbers in Quechua
                 return;
             }
 
@@ -2696,8 +2701,8 @@
             };
 
             await saveOrderToFirestore(currentOrder);
-            await addActivityToFirestore(currentOrder.orderNumber, 'Expedição', 'Informações de expedição salvas');
-            customAlert('Dados de expedição salvos com sucesso!');
+            await addActivityToFirestore(currentOrder.orderNumber, 'Apachiy', 'Apachiy willakuykuna waqaychasqa'); // Shipping information saved in Quechua
+            customAlert('Apachiy willakuykuna allichasqa waqaychasqa!', "Atención"); // Shipping data saved successfully in Quechua
         }
 
         async function confirmShipment() {
@@ -2707,7 +2712,7 @@
             const tracking = document.getElementById('shipment-tracking').value;
 
             if (!carrier || !tracking) {
-                customAlert('Preencha a transportadora e o número de rastreamento.');
+                customAlert('Apachiqta hinaspa qatiy yupayta huntachiy.', "Atención"); // Fill in carrier and tracking number in Quechua
                 return;
             }
 
@@ -2719,8 +2724,8 @@
 
             closeModal('shipment-modal');
             await saveOrderToFirestore(currentOrder);
-            await addActivityToFirestore(currentOrder.orderNumber, 'Expedição', `Enviado via ${carrier}`);
-            customAlert('Envio confirmado com sucesso!');
+            await addActivityToFirestore(currentOrder.orderNumber, 'Apachiy', `Apachisqa ${carrier}wan`); // Sent via carrier in Quechua
+            customAlert('Apachiy allichasqa watuchisqa!', "Atención"); // Shipment confirmed successfully in Quechua
         }
 
         function initLogisticsTab() {
@@ -2747,22 +2752,22 @@
                     document.getElementById('logistics-carrier').value = order.freightCompany || data.carrier || '';
                     document.getElementById('logistics-cost').value = (order.freightCost || data.cost || '').toString();
 
-                    showAttachmentsForOrder('logistics-attachments', order.orderNumber, 'Logística');
+                    showAttachmentsForOrder('logistics-attachments', order.orderNumber, 'Apachina'); // Logistics in Quechua
                 } else {
                     currentOrder = null;
                 }
             });
 
             document.getElementById('logistics-add-file').addEventListener('click', () => {
-                if(!currentOrder) { customAlert('Selecione um pedido primeiro.'); return; }
+                if(!currentOrder) { customAlert('Ñawpaqta mañakuyta akllay.', "Atención"); return; } // Select an order first in Quechua
                 document.getElementById('logistics-file-input').click();
             });
-            document.getElementById('logistics-file-input').addEventListener('change', e => handleFileUpload(e, 'Logística', 'Arquivo Logística', 'logistics-attachments'));
+            document.getElementById('logistics-file-input').addEventListener('change', e => handleFileUpload(e, 'Apachina', 'Qillqa Apachina', 'logistics-attachments')); // Logistics File in Quechua
             document.getElementById('logistics-save').addEventListener('click', saveLogisticsData);
         }
 
         async function saveLogisticsData() {
-            if (!currentOrder) { customAlert('Selecione um pedido.'); return; }
+            if (!currentOrder) { customAlert('Mañakuyta akllay.', "Atención"); return; } // Select an order in Quechua
 
             const cost = parseFloat(document.getElementById('logistics-cost').value);
             const carrier = document.getElementById('logistics-carrier').value;
@@ -2777,8 +2782,8 @@
             currentOrder.freightCost = isNaN(cost) ? 0 : cost;
 
             await saveOrderToFirestore(currentOrder);
-            await addActivityToFirestore(currentOrder.orderNumber, 'Logística', 'Informações de logística salvas');
-            customAlert('Dados de logística salvos com sucesso!');
+            await addActivityToFirestore(currentOrder.orderNumber, 'Apachina', 'Apachina willakuykuna waqaychasqa'); // Logistics information saved in Quechua
+            customAlert('Apachina willakuykuna allichasqa waqaychasqa!', "Atención"); // Logistics data saved successfully in Quechua
         }
 
         function initInvoiceTab() {
@@ -2813,25 +2818,25 @@
                         });
                     });
 
-                    showAttachmentsForOrder('invoice-attachments', order.orderNumber, 'Faturamento');
+                    showAttachmentsForOrder('invoice-attachments', order.orderNumber, 'Qullqi'); // Invoice in Quechua
                 } else {
                     currentOrder = null;
                 }
             });
 
             document.getElementById('invoice-add-file').addEventListener('click', () => {
-                if(!currentOrder) { customAlert('Selecione um pedido primeiro.'); return; }
+                if(!currentOrder) { customAlert('Ñawpaqta mañakuyta akllay.', "Atención"); return; } // Select an order first in Quechua
                 document.getElementById('invoice-file-input').click();
             });
-            document.getElementById('invoice-file-input').addEventListener('change', e => handleFileUpload(e, 'Faturamento', 'Arquivo Faturamento', 'invoice-attachments'));
+            document.getElementById('invoice-file-input').addEventListener('change', e => handleFileUpload(e, 'Qullqi', 'Qillqa Qullqi', 'invoice-attachments')); // Invoice File in Quechua
             document.getElementById('invoice-save').addEventListener('click', saveInvoiceData);
         }
 
         async function saveInvoiceData() {
-            if (!currentOrder) { customAlert('Selecione um pedido.'); return; }
+            if (!currentOrder) { customAlert('Mañakuyta akllay.', "Atención"); return; } // Select an order in Quechua
 
             const invoiceNumber = document.getElementById('invoice-number').value;
-            if (!invoiceNumber) { customAlert('Insira o número da fatura.'); return; }
+            if (!invoiceNumber) { customAlert('Qullqi yupayta churay.', "Atención"); return; } // Enter invoice number in Quechua
 
             document.getElementById('invoice-products-body').querySelectorAll('tr').forEach((row, index) => {
                 const price = parseFloat(row.querySelector('.product-price').value);
@@ -2841,11 +2846,11 @@
             });
 
             currentOrder.invoiceNumber = invoiceNumber;
-            currentOrder.invoice = { completed: true, notes: `Fatura ${invoiceNumber}` };
+            currentOrder.invoice = { completed: true, notes: `Qullqi ${invoiceNumber}` }; // Invoice in Quechua
 
             await saveOrderToFirestore(currentOrder);
-            await addActivityToFirestore(currentOrder.orderNumber, 'Faturamento', `Fatura ${invoiceNumber} salva.`);
-            customAlert('Dados de faturamento salvos com sucesso!');
+            await addActivityToFirestore(currentOrder.orderNumber, 'Qullqi', `Qullqi ${invoiceNumber} waqaychasqa.`); // Invoice saved in Quechua
+            customAlert('Qullqi willakuykuna allichasqa waqaychasqa!', "Atención"); // Invoice data saved successfully in Quechua
         }
 
         function initGanttTab() {
@@ -2861,44 +2866,44 @@
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
 
-            // Destrói a instância do gráfico existente, se houver
+            // Destroy existing chart instance, if any
             if (chartInstances[canvasId]) {
                 chartInstances[canvasId].destroy();
-                chartInstances[canvasId] = null; // Limpa a referência
+                chartInstances[canvasId] = null; // Clear reference
             }
 
             const tasks = [];
             const orderStartDate = parseDate(order.orderDate);
 
-            // Garante que orderStartDate seja um objeto Date válido
+            // Ensure orderStartDate is a valid Date object
             if (!orderStartDate || isNaN(orderStartDate.getTime())) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.font = '16px "Segoe UI"'; ctx.fillStyle = '#6c757d'; ctx.textAlign = 'center';
-                ctx.fillText('Data de início do pedido é inválida ou ausente.', canvas.width / 2, 50);
+                ctx.fillText('Mañakuy qallariy p\'unchaw mana allinchu utaq mana kanchu.', canvas.width / 2, 50); // Order start date is invalid or missing in Quechua
                 return;
             }
 
             const desiredDate = parseDate(order.desiredDeliveryDate);
-            // Garante que desiredDate seja um objeto Date válido antes de adicionar às tarefas
+            // Ensure desiredDate is a valid Date object before adding to tasks
             if (desiredDate && !isNaN(desiredDate.getTime()) && desiredDate >= orderStartDate) {
-                tasks.push({ name: 'Prazo Vendas', start: orderStartDate, end: desiredDate, color: 'rgba(54, 162, 235, 0.7)' });
+                tasks.push({ name: 'Ranqha P\'unchaw', start: orderStartDate, end: desiredDate, color: 'rgba(54, 162, 235, 0.7)' }); // Sales Deadline in Quechua
             }
 
             ['mechanics', 'electrical', 'refrigeration', 'assembly'].forEach(id => {
                 const promisedDate = parseDate(order[id]?.promisedDate);
-                // Garante que promisedDate seja um objeto Date válido antes de adicionar às tarefas
+                // Ensure promisedDate is a valid Date object before adding to tasks
                 if (promisedDate && !isNaN(promisedDate.getTime()) && promisedDate >= orderStartDate) {
-                    const name = {mechanics: 'Mecânica', electrical: 'Elétrica', refrigeration: 'Refrigeração', assembly: 'Montagem'}[id];
-                    // Para datas de ponto único, cria uma pequena duração para visibilidade
-                    const endDate = new Date(promisedDate.getTime() + (24 * 60 * 60 * 1000)); // Adiciona 1 dia para visibilidade
-                    tasks.push({ name: `Prazo ${name}`, start: promisedDate, end: endDate, color: 'rgba(255, 99, 132, 0.7)' });
+                    const name = {mechanics: 'Mecánica', electrical: 'Eléctrica', refrigeration: 'Chiriq', assembly: 'Huñu'}[id]; // Mechanics, Electrical, Refrigeration, Assembly in Quechua
+                    // For single-point dates, create a small duration for visibility
+                    const endDate = new Date(promisedDate.getTime() + (24 * 60 * 60 * 1000)); // Add 1 day for visibility
+                    tasks.push({ name: `P\'unchaw ${name}`, start: promisedDate, end: endDate, color: 'rgba(255, 99, 132, 0.7)' }); // Deadline Dept Name in Quechua
                 }
             });
 
             if (tasks.length === 0) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.font = '16px "Segoe UI"'; ctx.fillStyle = '#6c757d'; ctx.textAlign = 'center';
-                ctx.fillText('Não há datas de tarefas válidas para exibir o gráfico.', canvas.width / 2, 50);
+                ctx.fillText('Mana allin llamkay p\'unchawkuna kanchu grafikuta rikuchinapaq.', canvas.width / 2, 50); // No valid task dates to display the graph in Quechua
                 return;
             }
 
@@ -2923,8 +2928,8 @@
                                     day: 'dd/MM'
                                 }
                             },
-                            min: Math.min(...tasks.map(t => t.start.getTime())) - (24 * 60 * 60 * 1000 * 5), // Adiciona buffer
-                            max: Math.max(...tasks.map(t => t.end.getTime())) + (24 * 60 * 60 * 1000 * 5) // Adiciona buffer
+                            min: Math.min(...tasks.map(t => t.start.getTime())) - (24 * 60 * 60 * 1000 * 5), // Add buffer
+                            max: Math.max(...tasks.map(t => t.end.getTime())) + (24 * 60 * 60 * 1000 * 5) // Add buffer
                         }
                     },
                     plugins: { legend: { display: false }}
@@ -2937,12 +2942,12 @@
             container.innerHTML = '';
             const attachments = attachmentsData.filter(a => a.orderNumber === orderNumber && a.department === department);
 
-            if (attachments.length === 0) { container.innerHTML = '<p>Nenhum anexo.</p>'; return; }
+            if (attachments.length === 0) { container.innerHTML = '<p>Mana qillqakuna kanchu.</p>'; return; } // No attachments in Quechua
 
             attachments.forEach(att => {
                 const item = document.createElement('div');
                 item.className = 'attachment-item';
-                item.innerHTML = `<h4>${att.name}</h4><p>Dept: ${att.department}</p><div class="attachment-actions"><button class="btn btn-sm download-attachment" data-id="${att.id}">Download</button> <button class="btn btn-sm btn-danger delete-attachment" data-id="${att.id}">Excluir</button></div>`;
+                item.innerHTML = `<h4>${att.name}</h4><p>Tupuy: ${att.department}</p><div class="attachment-actions"><button class="btn btn-sm download-attachment" data-id="${att.id}">Uraychay</button> <button class="btn btn-sm btn-danger delete-attachment" data-id="${att.id}">Pichay</button></div>`; // Dept, Download, Delete in Quechua
                 container.appendChild(item);
             });
 
@@ -2961,25 +2966,25 @@
             const reader = new FileReader();
             reader.onload = async function(e) {
                 const attachment = {
-                    id: generateId(), // O Firestore gerará seu próprio ID, mas este é para referência local
+                    id: generateId(), // Firestore will generate its own ID, but this is for local reference
                     orderNumber: currentOrder.orderNumber,
                     department,
                     name: file.name,
                     type: fileType,
                     size: file.size,
                     date: new Date().toISOString(),
-                    data: e.target.result // Dados do arquivo codificados em Base64
+                    data: e.target.result // Base64 encoded file data
                 };
 
                 await addAttachmentToFirestore(attachment);
 
                 showAttachmentsForOrder(containerId, currentOrder.orderNumber, department);
 
-                await addActivityToFirestore(currentOrder.orderNumber, department, `Anexo: ${file.name}`);
-                customAlert(`Arquivo "${file.name}" anexado com sucesso!`);
+                await addActivityToFirestore(currentOrder.orderNumber, department, `Qillqa: ${file.name}`); // Attachment in Quechua
+                customAlert(`Qillqa "${file.name}" allichasqa yapasqa!`, "Atención"); // File attached successfully in Quechua
             };
             reader.readAsDataURL(file);
-            event.target.value = ''; // Limpa o input do arquivo
+            event.target.value = ''; // Clear the file input
         }
     </script>
 </body>
