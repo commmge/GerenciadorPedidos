@@ -1070,37 +1070,27 @@
     
     <script type="module">
 
-
-
-  console.log("Verificando Firebase SDKs...");
-  if (typeof firebase === 'undefined') {
-    console.error("Firebase SDK não carregado!");
-  } else {
-    console.log("Firebase SDK carregado com sucesso");
-  }
-
         // Importações do Firebase
-
-const __firebase_config = {
-    apiKey: "Mge",
-    authDomain: "GerenciadorPedidosMge.firebaseapp.com",
-    projectId: "GerenciadorPedidosMge",
-    storageBucket: "GerenciadorPedidosMge.appspot.com",
-    messagingSenderId: "123456789012",
-    appId: "1:123456789012:web:abcdef1234567890abcdef"
-  };
-  const __app_id = "GerenciadorPedidosMge"; // Geralmente o mesmo que projectId
-  
-  console.log("Configuração do Firebase carregada:", __firebase_config);
-
-
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Variáveis globais para Firebase e dados da aplicação
+        // Access __app_id and __firebase_config directly as they are provided by the environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        let firebaseConfig = {};
+        if (typeof __firebase_config !== 'undefined') {
+            if (typeof __firebase_config === 'string') {
+                try {
+                    firebaseConfig = JSON.parse(__firebase_config);
+                } catch (e) {
+                    console.error("Erro ao fazer parse de __firebase_config:", e);
+                    firebaseConfig = {}; // Fallback if parsing fails
+                }
+            } else {
+                firebaseConfig = __firebase_config; // __firebase_config is already an object
+            }
+        }
 
         let app;
         let db;
@@ -1145,12 +1135,12 @@ const __firebase_config = {
 
         // Inicializa o Firebase e a autenticação
         async function initializeFirebase() {
-    try {
-        console.log("Inicializando Firebase com configuração:", firebaseConfig);
-        app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-        console.log("Firebase inicializado com sucesso");
+            try {
+                console.log("Inicializando Firebase com configuração:", firebaseConfig);
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                console.log("Firebase inicializado com sucesso");
 
 
                 // Listener para o estado de autenticação
@@ -1172,12 +1162,12 @@ const __firebase_config = {
                     }
                     document.getElementById('loading-overlay').style.display = 'none'; // Esconde o overlay de carregamento
                 });
-    } catch (error) {
-        console.error("Erro ao inicializar Firebase:", error);
-        customAlert("Erro crítico: Não foi possível conectar ao Firebase. Verifique sua conexão e atualize a página.");
-        document.getElementById('loading-overlay').style.display = 'none';
-    }
-}
+            } catch (error) {
+                console.error("Erro ao inicializar Firebase:", error);
+                customAlert("Erro crítico: Não foi possível conectar ao Firebase. Verifique sua conexão e atualize a página.");
+                document.getElementById('loading-overlay').style.display = 'none';
+            }
+        }
         // Funções para gerenciar o Firestore
         async function loadDataFromFirestore() {
             if (!db || !userId) {
@@ -2301,7 +2291,7 @@ const __firebase_config = {
                     item.className = 'attachment-item';
                     item.innerHTML = `<h4>${attachment.name}</h4><p>Dept: ${attachment.department}</p><div class="attachment-actions"><button class="btn btn-sm download-attachment" data-id="${attachment.id}">Download</button> <button class="btn btn-sm btn-danger delete-attachment" data-id="${attachment.id}">Excluir</button></div>`;
                     item.querySelector('.download-attachment').addEventListener('click', e => downloadAttachment(e.target.getAttribute('data-id')));
-                    item.querySelector('.delete-attachment').addEventListener('click', e => deleteAttachment(e.target.getAttribute('data-id'), orderNumber)); // Corrected: removed extra ')'
+                    item.querySelector('.delete-attachment').addEventListener('click', e => deleteAttachment(e.target.getAttribute('data-id'), orderNumber));
                     html += item.outerHTML; // Adiciona o HTML do item ao HTML geral
                 });
             }
