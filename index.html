@@ -7,7 +7,34 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // Expõe objetos Firebase ao escopo global para facilitar o acesso no script principal
+        window.firebase = {
+            initializeApp,
+            getAuth,
+            signInAnonymously,
+            signInWithCustomToken,
+            onAuthStateChanged,
+            getFirestore,
+            doc,
+            getDoc,
+            addDoc,
+            setDoc,
+            updateDoc,
+            deleteDoc,
+            onSnapshot,
+            collection,
+            query,
+            where,
+            getDocs,
+            writeBatch
+        };
+    </script>
     <style>
         :root {
             --primary-color: #2c3e50;
@@ -293,7 +320,7 @@
             width: 100%;
             overflow-x: auto;
             margin-top: 20px;
-            height: 300px; /* Give the container a fixed height */
+            height: 300px; /* Define uma altura fixa para o contêiner */
             position: relative;
         }
 
@@ -326,17 +353,17 @@
             }
         }
 
-        /* Custom Alert/Message Box Styles */
+        /* Estilos para o Modal de Alerta/Mensagem Personalizado */
         .custom-alert-modal {
-            display: none; /* Hidden by default */
-            position: fixed; /* Stay in place */
-            z-index: 1001; /* Sit on top */
+            display: none; /* Oculto por padrão */
+            position: fixed; /* Permanece no lugar */
+            z-index: 1001; /* Fica no topo */
             left: 0;
             top: 0;
-            width: 100%; /* Full width */
-            height: 100%; /* Full height */
-            overflow: auto; /* Enable scroll if needed */
-            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+            width: 100%; /* Largura total */
+            height: 100%; /* Altura total */
+            overflow: auto; /* Habilita rolagem se necessário */
+            background-color: rgba(0,0,0,0.4); /* Preto com opacidade */
             justify-content: center;
             align-items: center;
         }
@@ -383,7 +410,7 @@
     <div class="container">
         <header>
             <h1>Sistema de Gerenciamento de Pedidos</h1>
-            <p id="user-info" style="text-align: center; font-size: 0.9em; margin-top: 10px;">Dados armazenados localmente no seu navegador.</p>
+            <p id="user-info" style="text-align: center; font-size: 0.9em; margin-top: 10px;"></p>
         </header>
 
         <ul class="nav-tabs">
@@ -433,8 +460,8 @@
             </div>
 
             <div class="alert alert-warning" style="margin-top: 20px;">
-                <strong>Atenção:</strong> Os dados são armazenados localmente no seu navegador. Eles não são sincronizados entre dispositivos.
-                Use a função "Apagar Todos os Dados" para remover permanentemente seus dados do navegador.
+                <strong>Atenção:</strong> Os dados são armazenados online e são persistentes.
+                Use a função "Apagar Todos os Dados" para remover permanentemente seus dados.
             </div>
 
             <table id="orders-table">
@@ -1012,7 +1039,7 @@
         </div>
     </div>
 
-    <!-- Custom Alert/Message Box -->
+    <!-- Modal de Alerta/Mensagem Personalizado -->
     <div id="custom-alert-modal" class="custom-alert-modal">
         <div class="custom-alert-content">
             <h3 id="custom-alert-title"></h3>
@@ -1021,7 +1048,7 @@
         </div>
     </div>
 
-    <!-- Custom Confirm Modal -->
+    <!-- Modal de Confirmação Personalizado -->
     <div id="custom-confirm-modal" class="custom-alert-modal">
         <div class="custom-alert-content">
             <h3 id="custom-confirm-title"></h3>
@@ -1033,15 +1060,15 @@
         </div>
     </div>
 
-    <script>
-        // Chaves para o LocalStorage
-        const STORAGE_KEYS = {
-            ORDERS: 'ordersData',
-            ACTIVITIES: 'activitiesData',
-            ATTACHMENTS: 'attachmentsData'
-        };
+    <script type="module">
+        // Variáveis Firebase (serão inicializadas em initFirebase)
+        let app;
+        let db;
+        let auth;
+        let userId = 'anonymous'; // Padrão para anônimo até autenticação
+        let isAuthReady = false; // Flag para garantir que o Firebase esteja pronto antes das operações
 
-        // Caches de dados locais
+        // Caches de dados locais, atualizados por snapshots do Firestore
         let ordersData = [];
         let activitiesData = [];
         let attachmentsData = [];
@@ -1052,9 +1079,22 @@
         // Objeto global para armazenar instâncias de gráficos
         let chartInstances = {};
 
+        // Variáveis globais fornecidas pelo ambiente Canvas (se aplicável)
+        // Se você estiver implantando isso diretamente no GitHub Pages, precisará configurar
+        // seu próprio projeto Firebase e colar as credenciais aqui ou usar variáveis de ambiente
+        // ou um proxy para segurança em produção. Para fins de demonstração, deixamos como está.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Caminhos das Coleções do Firestore
+        const getOrdersCollection = () => firebase.collection(db, `artifacts/${appId}/users/${userId}/orders`);
+        const getActivitiesCollection = () => firebase.collection(db, `artifacts/${appId}/users/${userId}/activities`);
+        const getAttachmentsCollection = () => firebase.collection(db, `artifacts/${appId}/users/${userId}/attachments`);
+
         // Inicializa a aplicação
-        document.addEventListener('DOMContentLoaded', function() {
-            loadFromLocalStorage(); // Carrega os dados do localStorage ao iniciar
+        document.addEventListener('DOMContentLoaded', async function() {
+            await initFirebase(); // Inicializa o Firebase primeiro
             setupTabs();
             initPanelTab();
             initSalesTab();
@@ -1072,78 +1112,162 @@
             setupModals();
             setupCustomAlert();
             setupCustomConfirm();
-            updateUI(); // Atualiza a UI com os dados carregados
         });
 
-        // Funções para gerenciar LocalStorage
-        function loadFromLocalStorage() {
+        async function initFirebase() {
             try {
-                ordersData = JSON.parse(localStorage.getItem(STORAGE_KEYS.ORDERS)) || [];
-                activitiesData = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACTIVITIES)) || [];
-                attachmentsData = JSON.parse(localStorage.getItem(STORAGE_KEYS.ATTACHMENTS)) || [];
-            } catch (e) {
-                console.error("Erro ao carregar dados do LocalStorage:", e);
-                customAlert("Erro ao carregar dados salvos. Seus dados podem estar corrompidos. Tente apagar todos os dados.");
-                // Limpa o localStorage para evitar loop de erro
-                localStorage.clear();
-                ordersData = [];
-                activitiesData = [];
-                attachmentsData = [];
+                app = firebase.initializeApp(firebaseConfig);
+                db = firebase.getFirestore(app);
+                auth = firebase.getAuth(app);
+
+                // Autentica o usuário
+                if (initialAuthToken) {
+                    await firebase.signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await firebase.signInAnonymously(auth);
+                }
+
+                // Escuta as mudanças de estado de autenticação e define o userId
+                firebase.onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        document.getElementById('user-info').textContent = `ID do Usuário: ${userId}`;
+                        isAuthReady = true;
+                        // Começa a escutar os dados do Firestore assim que autenticado
+                        setupFirestoreListeners();
+                        updateUI(); // Atualização inicial da UI após autenticação e listeners configurados
+                    } else {
+                        userId = 'anonymous';
+                        document.getElementById('user-info').textContent = `ID do Usuário: ${userId} (Anônimo)`;
+                        isAuthReady = false;
+                        // Limpa os dados locais se o usuário sair ou não estiver autenticado
+                        ordersData = [];
+                        activitiesData = [];
+                        attachmentsData = [];
+                        updateUI();
+                    }
+                });
+            } catch (error) {
+                console.error("Erro ao inicializar o Firebase:", error);
+                customAlert("Erro ao inicializar o sistema de banco de dados. Tente novamente mais tarde.");
             }
         }
 
-        function saveToLocalStorage() {
-            try {
-                localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(ordersData));
-                localStorage.setItem(STORAGE_KEYS.ACTIVITIES, JSON.stringify(activitiesData));
-                localStorage.setItem(STORAGE_KEYS.ATTACHMENTS, JSON.stringify(attachmentsData));
-            } catch (e) {
-                console.error("Erro ao salvar dados no LocalStorage:", e);
-                customAlert("Erro ao salvar dados. Seu navegador pode estar sem espaço ou em modo de navegação privada.");
-            }
-        }
-
-        // Funções de persistência de dados adaptadas para LocalStorage
-        async function saveOrderToStorage(order) {
-            const index = ordersData.findIndex(o => o.orderNumber === order.orderNumber);
-            if (index !== -1) {
-                ordersData[index] = order;
-            } else {
-                ordersData.push(order);
-            }
-            saveToLocalStorage();
-            updateUI(); // Atualiza a UI após salvar
-            return order;
-        }
-
-        async function deleteOrderFromStorage(orderNumber) {
-            ordersData = ordersData.filter(o => o.orderNumber !== orderNumber);
-            attachmentsData = attachmentsData.filter(a => a.orderNumber !== orderNumber);
-            activitiesData = activitiesData.filter(a => a.orderNumber !== orderNumber);
-            saveToLocalStorage();
-            updateUI(); // Atualiza a UI após deletar
-        }
-
-        async function addActivityToStorage(orderNumber, department, action) {
-            activitiesData.push({
-                id: generateId(), // Garante um ID único para a atividade
-                timestamp: new Date().toISOString(),
-                orderNumber,
-                department,
-                action
+        function setupFirestoreListeners() {
+            // Listener de Pedidos
+            firebase.onSnapshot(getOrdersCollection(), (snapshot) => {
+                ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                updateUI(); // Atualiza a UI sempre que os pedidos mudarem
+            }, (error) => {
+                console.error("Erro ao buscar pedidos:", error);
+                customAlert("Erro ao carregar pedidos.");
             });
-            saveToLocalStorage();
-            updateActivityLog(); // Atualiza o log de atividades
+
+            // Listener de Atividades
+            firebase.onSnapshot(getActivitiesCollection(), (snapshot) => {
+                activitiesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                updateActivityLog(); // Atualiza o log de atividades sempre que as atividades mudarem
+            }, (error) => {
+                console.error("Erro ao buscar atividades:", error);
+                customAlert("Erro ao carregar atividades.");
+            });
+
+            // Listener de Anexos
+            firebase.onSnapshot(getAttachmentsCollection(), (snapshot) => {
+                attachmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Anexos são atualizados sob demanda para visualizações de pedidos específicas, então não há updateUI global aqui.
+            }, (error) => {
+                console.error("Erro ao buscar anexos:", error);
+                customAlert("Erro ao carregar anexos.");
+            });
         }
 
-        async function addAttachmentToStorage(attachment) {
-            attachmentsData.push(attachment);
-            saveToLocalStorage();
+        // Salva dados no Firestore
+        async function saveOrderToFirestore(order) {
+            if (!isAuthReady) {
+                customAlert('Sistema não autenticado. Tente novamente.');
+                return;
+            }
+            try {
+                const orderRef = firebase.doc(getOrdersCollection(), order.orderNumber);
+                await firebase.setDoc(orderRef, order, { merge: true });
+            } catch (e) {
+                console.error("Erro ao salvar pedido: ", e);
+                customAlert("Erro ao salvar pedido.");
+            }
         }
 
-        async function deleteAttachmentFromStorage(attachmentId) {
-            attachmentsData = attachmentsData.filter(a => a.id !== attachmentId);
-            saveToLocalStorage();
+        async function deleteOrderFromFirestore(orderNumber) {
+            if (!isAuthReady) {
+                customAlert('Sistema não autenticado. Tente novamente.');
+                return;
+            }
+            try {
+                // Exclui o documento do pedido
+                await firebase.deleteDoc(firebase.doc(getOrdersCollection(), orderNumber));
+
+                // Exclui os anexos associados
+                const qAttachments = firebase.query(getAttachmentsCollection(), firebase.where("orderNumber", "==", orderNumber));
+                const attachmentDocs = await firebase.getDocs(qAttachments);
+                const batch = firebase.writeBatch(db);
+                attachmentDocs.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+
+                // Exclui as atividades associadas
+                const qActivities = firebase.query(getActivitiesCollection(), firebase.where("orderNumber", "==", orderNumber));
+                const activityDocs = await firebase.getDocs(qActivities);
+                const activityBatch = firebase.writeBatch(db);
+                activityDocs.forEach(doc => {
+                    activityBatch.delete(doc.ref);
+                });
+                await activityBatch.commit();
+
+            } catch (e) {
+                console.error("Erro ao excluir pedido: ", e);
+                customAlert("Erro ao excluir pedido.");
+            }
+        }
+
+        async function addActivityToFirestore(orderNumber, department, action) {
+            if (!isAuthReady) return;
+            try {
+                await firebase.addDoc(getActivitiesCollection(), {
+                    timestamp: new Date().toISOString(),
+                    orderNumber,
+                    department,
+                    action
+                });
+            } catch (e) {
+                console.error("Erro ao adicionar atividade: ", e);
+            }
+        }
+
+        async function addAttachmentToFirestore(attachment) {
+            if (!isAuthReady) {
+                customAlert('Sistema não autenticado. Tente novamente.');
+                return;
+            }
+            try {
+                await firebase.addDoc(getAttachmentsCollection(), attachment);
+            } catch (e) {
+                console.error("Erro ao anexar arquivo: ", e);
+                customAlert("Erro ao anexar arquivo.");
+            }
+        }
+
+        async function deleteAttachmentFromFirestore(attachmentId) {
+            if (!isAuthReady) {
+                customAlert('Sistema não autenticado. Tente novamente.');
+                return;
+            }
+            try {
+                await firebase.deleteDoc(firebase.doc(getAttachmentsCollection(), attachmentId));
+            } catch (e) {
+                console.error("Erro ao excluir anexo: ", e);
+                customAlert("Erro ao excluir anexo.");
+            }
         }
 
         // Configura a navegação entre as abas
@@ -1463,13 +1587,31 @@
         }
 
         async function clearAllUserData() {
-            customConfirm('Tem certeza que deseja apagar TODOS os seus dados (pedidos, atividades, anexos)? Esta ação é irreversível.', 'Apagar Todos os Dados', () => {
-                localStorage.clear();
-                ordersData = [];
-                activitiesData = [];
-                attachmentsData = [];
-                updateUI();
-                customAlert('Todos os seus dados foram apagados com sucesso.');
+            customConfirm('Tem certeza que deseja apagar TODOS os seus dados (pedidos, atividades, anexos)? Esta ação é irreversível.', 'Apagar Todos os Dados', async () => {
+                if (!isAuthReady) {
+                    customAlert('Sistema não autenticado. Tente novamente.');
+                    return;
+                }
+                try {
+                    const collectionsToClear = [
+                        getOrdersCollection(),
+                        getActivitiesCollection(),
+                        getAttachmentsCollection()
+                    ];
+
+                    for (const colRef of collectionsToClear) {
+                        const docs = await firebase.getDocs(colRef);
+                        const batch = firebase.writeBatch(db);
+                        docs.forEach(doc => {
+                            batch.delete(doc.ref);
+                        });
+                        await batch.commit();
+                    }
+                    customAlert('Todos os seus dados foram apagados com sucesso.');
+                } catch (error) {
+                    console.error("Erro ao apagar todos os dados do usuário:", error);
+                    customAlert("Erro ao apagar todos os dados.");
+                }
             });
         }
 
@@ -1644,7 +1786,7 @@
                 if (!currentOrder.bom) currentOrder.bom = [];
                 currentOrder.bom.push(newItem);
                 updateBOMTable('elec-bom-body', currentOrder.bom);
-                addActivityToStorage(currentOrder.orderNumber, 'Elétrica', 'Novo item adicionado à lista de materiais.');
+                addActivityToFirestore(currentOrder.orderNumber, 'Elétrica', 'Novo item adicionado à lista de materiais.');
             });
 
             document.getElementById('elec-add-file').addEventListener('click', () => {
@@ -1689,12 +1831,12 @@
                 products
             });
 
-            await saveOrderToStorage(orderData);
+            await saveOrderToFirestore(orderData);
 
             if (orderIndex === -1) {
-                await addActivityToStorage(orderNumber, 'Vendas', 'Pedido criado');
+                await addActivityToFirestore(orderNumber, 'Vendas', 'Pedido criado');
             } else {
-                await addActivityToStorage(orderNumber, 'Vendas', 'Pedido atualizado');
+                await addActivityToFirestore(orderNumber, 'Vendas', 'Pedido atualizado');
             }
 
             customAlert(`Pedido ${orderNumber} salvo com sucesso!`);
@@ -1730,8 +1872,8 @@
             currentOrder.planning.notes = document.getElementById('planning-notes').value;
             currentOrder.planning.completed = true;
 
-            await saveOrderToStorage(currentOrder);
-            await addActivityToStorage(currentOrder.orderNumber, 'Planejamento', 'Datas prometidas atualizadas');
+            await saveOrderToFirestore(currentOrder);
+            await addActivityToFirestore(currentOrder.orderNumber, 'Planejamento', 'Datas prometidas atualizadas');
             customAlert('Dados de planejamento salvos com sucesso!');
         }
 
@@ -1748,8 +1890,8 @@
             if (!currentOrder.purchasing) currentOrder.purchasing = {};
             currentOrder.purchasing.completed = true;
 
-            await saveOrderToStorage(currentOrder);
-            await addActivityToStorage(currentOrder.orderNumber, 'Compras', 'Lista de materiais e datas de fornecedores atualizadas');
+            await saveOrderToFirestore(currentOrder);
+            await addActivityToFirestore(currentOrder.orderNumber, 'Compras', 'Lista de materiais e datas de fornecedores atualizadas');
             customAlert('Dados de compras salvos com sucesso!');
         }
 
@@ -1766,8 +1908,8 @@
             if (!currentOrder.warehouse) currentOrder.warehouse = {};
             currentOrder.warehouse.completed = true;
 
-            await saveOrderToStorage(currentOrder);
-            await addActivityToStorage(currentOrder.orderNumber, 'Estoque', 'Níveis de estoque atualizados');
+            await saveOrderToFirestore(currentOrder);
+            await addActivityToFirestore(currentOrder.orderNumber, 'Estoque', 'Níveis de estoque atualizados');
             customAlert('Dados de estoque salvos com sucesso!');
 
             // Renderiza novamente as abas relacionadas se estiverem ativas
@@ -1821,8 +1963,8 @@
 
             updateCurrentPromisedDate(currentOrder);
 
-            await saveOrderToStorage(currentOrder);
-            await addActivityToStorage(currentOrder.orderNumber, 'Elétrica', 'Lista de materiais e informações atualizadas');
+            await saveOrderToFirestore(currentOrder);
+            await addActivityToFirestore(currentOrder.orderNumber, 'Elétrica', 'Lista de materiais e informações atualizadas');
             customAlert('Dados de elétrica salvos com sucesso!');
         }
 
@@ -1877,8 +2019,8 @@
                     if(!currentOrder.purchasing) currentOrder.purchasing = {};
                     currentOrder.purchasing.completed = true;
 
-                    await saveOrderToStorage(currentOrder);
-                    await addActivityToStorage(currentOrder.orderNumber, department, `Lista de materiais importada: ${file.name}`);
+                    await saveOrderToFirestore(currentOrder);
+                    await addActivityToFirestore(currentOrder.orderNumber, department, `Lista de materiais importada: ${file.name}`);
                     customAlert(`Lista de materiais importada com sucesso! ${bom.length} itens encontrados.`);
                 } catch (error) {
                     console.error('Erro ao importar BOM:', error);
@@ -1919,8 +2061,8 @@
                         const itemIndex = currentOrder.bom.findIndex(i => i.numero === item.numero && i.componente === item.componente);
                         if(itemIndex > -1) {
                             currentOrder.bom.splice(itemIndex, 1);
-                            await saveOrderToStorage(currentOrder);
-                            await addActivityToStorage(currentOrder.orderNumber, 'Elétrica', `Item ${item.componente} removido.`);
+                            await saveOrderToFirestore(currentOrder);
+                            await addActivityToFirestore(currentOrder.orderNumber, 'Elétrica', `Item ${item.componente} removido.`);
                             updateBOMTable('elec-bom-body', currentOrder.bom); // Renderiza novamente a tabela após a remoção
                         }
                     });
@@ -1977,8 +2119,8 @@
         function deleteOrder(orderNumber) {
             customConfirm(`Tem certeza que deseja excluir o pedido ${orderNumber}? Esta ação não pode ser desfeita.`, 'Confirmação',
                 async () => { // Callback para Sim
-                    await deleteOrderFromStorage(orderNumber);
-                    await addActivityToStorage(orderNumber, 'Sistema', `Pedido ${orderNumber} excluído`);
+                    await deleteOrderFromFirestore(orderNumber);
+                    await addActivityToFirestore(orderNumber, 'Sistema', `Pedido ${orderNumber} excluído`);
                     customAlert(`Pedido ${orderNumber} excluído com sucesso.`);
                 }
             );
@@ -2138,9 +2280,9 @@
             customConfirm('Tem certeza que deseja excluir este anexo?', 'Confirmação',
                 async () => { // Callback para Sim
                     const deletedAttachment = attachmentsData.find(a => a.id === attachmentId);
-                    await deleteAttachmentFromStorage(attachmentId);
+                    await deleteAttachmentFromFirestore(attachmentId);
                     showAttachments(orderNumber); // Atualiza a visualização
-                    await addActivityToStorage(orderNumber, 'Sistema', `Anexo ${deletedAttachment.name} excluído`);
+                    await addActivityToFirestore(orderNumber, 'Sistema', `Anexo ${deletedAttachment.name} excluído`);
                     customAlert(`Anexo "${deletedAttachment.name}" excluído com sucesso.`);
                 }
             );
@@ -2207,7 +2349,7 @@
 
             if (typeof dateString !== 'string') return null;
 
-            // Tenta analisar como string ISO primeiro (do LocalStorage)
+            // Tenta analisar como string ISO primeiro (do Firestore)
             const isoDate = new Date(dateString);
             if (!isNaN(isoDate.getTime())) return isoDate;
 
@@ -2255,6 +2397,8 @@
                     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
                     const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
+                    const batch = firebase.writeBatch(db);
+
                     for (const item of jsonData) {
                         try {
                             const orderNumber = item['Nº Pedido']?.toString();
@@ -2285,22 +2429,23 @@
                                 purchasing: {}, warehouse: {}
                             };
 
-                            ordersData.push(newOrder);
-                            await addActivityToStorage(newOrder.orderNumber, 'Sistema', 'Pedido importado');
+                            const orderRef = firebase.doc(getOrdersCollection(), newOrder.orderNumber);
+                            batch.set(orderRef, newOrder);
+                            await addActivityToFirestore(newOrder.orderNumber, 'Sistema', 'Pedido importado');
                             importedCount++;
                         } catch (rowError) {
                             console.error(`Erro ao processar linha:`, rowError);
                             skippedCount++;
                         }
                     }
+                    await batch.commit();
 
-                    saveToLocalStorage();
-                    customAlert(`Importação concluída.\n${importedCount} novos pedidos importados.\n${skippedCount} pedidos ignorados (inválidos, duplicados ou com erros).`);
                 } catch (fileError) {
                     console.error('Erro ao importar arquivo Excel:', fileError);
                     customAlert('Erro ao importar o arquivo. Verifique o formato do arquivo.');
                     return;
                 }
+                customAlert(`Importação concluída.\n${importedCount} novos pedidos importados.\n${skippedCount} pedidos ignorados (inválidos, duplicados ou com erros).`);
             };
             reader.readAsArrayBuffer(file);
         }
@@ -2373,11 +2518,11 @@
 
             if(dept.id === 'assembly' && ['mechanics', 'electrical', 'refrigeration', 'assembly'].every(d => currentOrder[d]?.completed)) {
                 currentOrder.dateReady = new Date().toISOString();
-                await addActivityToStorage(currentOrder.orderNumber, 'Montagem', 'Pronto para expedição');
+                await addActivityToFirestore(currentOrder.orderNumber, 'Montagem', 'Pronto para expedição');
             }
 
-            await saveOrderToStorage(currentOrder);
-            await addActivityToStorage(currentOrder.orderNumber, dept.name, 'Informações atualizadas');
+            await saveOrderToFirestore(currentOrder);
+            await addActivityToFirestore(currentOrder.orderNumber, dept.name, 'Informações atualizadas');
             customAlert(`Dados de ${dept.name} salvos com sucesso!`);
         }
 
@@ -2550,8 +2695,8 @@
                 completed: packages.length > 0
             };
 
-            await saveOrderToStorage(currentOrder);
-            await addActivityToStorage(currentOrder.orderNumber, 'Expedição', 'Informações de expedição salvas');
+            await saveOrderToFirestore(currentOrder);
+            await addActivityToFirestore(currentOrder.orderNumber, 'Expedição', 'Informações de expedição salvas');
             customAlert('Dados de expedição salvos com sucesso!');
         }
 
@@ -2573,8 +2718,8 @@
             currentOrder.shipping.completed = true;
 
             closeModal('shipment-modal');
-            await saveOrderToStorage(currentOrder);
-            await addActivityToStorage(currentOrder.orderNumber, 'Expedição', `Enviado via ${carrier}`);
+            await saveOrderToFirestore(currentOrder);
+            await addActivityToFirestore(currentOrder.orderNumber, 'Expedição', `Enviado via ${carrier}`);
             customAlert('Envio confirmado com sucesso!');
         }
 
@@ -2631,8 +2776,8 @@
             currentOrder.freightCompany = carrier;
             currentOrder.freightCost = isNaN(cost) ? 0 : cost;
 
-            await saveOrderToStorage(currentOrder);
-            await addActivityToStorage(currentOrder.orderNumber, 'Logística', 'Informações de logística salvas');
+            await saveOrderToFirestore(currentOrder);
+            await addActivityToFirestore(currentOrder.orderNumber, 'Logística', 'Informações de logística salvas');
             customAlert('Dados de logística salvos com sucesso!');
         }
 
@@ -2698,8 +2843,8 @@
             currentOrder.invoiceNumber = invoiceNumber;
             currentOrder.invoice = { completed: true, notes: `Fatura ${invoiceNumber}` };
 
-            await saveOrderToStorage(currentOrder);
-            await addActivityToStorage(currentOrder.orderNumber, 'Faturamento', `Fatura ${invoiceNumber} salva.`);
+            await saveOrderToFirestore(currentOrder);
+            await addActivityToFirestore(currentOrder.orderNumber, 'Faturamento', `Fatura ${invoiceNumber} salva.`);
             customAlert('Dados de faturamento salvos com sucesso!');
         }
 
@@ -2816,7 +2961,7 @@
             const reader = new FileReader();
             reader.onload = async function(e) {
                 const attachment = {
-                    id: generateId(),
+                    id: generateId(), // O Firestore gerará seu próprio ID, mas este é para referência local
                     orderNumber: currentOrder.orderNumber,
                     department,
                     name: file.name,
@@ -2826,11 +2971,11 @@
                     data: e.target.result // Dados do arquivo codificados em Base64
                 };
 
-                await addAttachmentToStorage(attachment);
+                await addAttachmentToFirestore(attachment);
 
                 showAttachmentsForOrder(containerId, currentOrder.orderNumber, department);
 
-                await addActivityToStorage(currentOrder.orderNumber, department, `Anexo: ${file.name}`);
+                await addActivityToFirestore(currentOrder.orderNumber, department, `Anexo: ${file.name}`);
                 customAlert(`Arquivo "${file.name}" anexado com sucesso!`);
             };
             reader.readAsDataURL(file);
